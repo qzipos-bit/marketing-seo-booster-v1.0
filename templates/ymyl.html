@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% set active = 'ymyl' %}
+{% block title %}YMYL Audit — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = 'Аудит / YMYL' %}
+{% set page_title = 'YMYL Audit — Financial Security' %}
+{% set page_subtitle %}
+  {{ item_count }} критериев · harm prevention ·
+  {% if run %}{{ run.label }}{% else %}Запусти проверку{% endif %}
+  · {{ lib_stats.documents }} docs в библиотеке
+{% endset %}
+{% set page_actions %}
+  <a class="btn" href="/ymyl-library">⚠️ YMYL Library</a>
+  <a class="btn" href="/api/export/ymyl-library.md">📄 Экспорт</a>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<section class="ymyl-hero">
+  <div class="ymyl-hero-main">
+    {% if run and run.summary %}
+    <div class="grade {{ run.summary.grade }}">{{ run.summary.grade }}</div>
+    <div class="ymyl-hero-stats">
+      <div class="stat"><div class="val">{{ run.summary.score }}%</div><div class="lbl">YMYL Score</div></div>
+      <div class="stat"><div class="val stat-val--fail">{{ run.summary.counts.fail }}</div><div class="lbl">Fail</div></div>
+      <div class="stat"><div class="val stat-val--warn">{{ run.summary.counts.warn }}</div><div class="lbl">Warn</div></div>
+      <div class="stat"><div class="val">{{ lib_stats.insights }}</div><div class="lbl">Harm insights</div></div>
+    </div>
+    {% else %}
+    <div class="grade F">—</div>
+    <p class="ymyl-hero-hint">Запусти YMYL-аудит для оценки финансового вреда (YY01–YY28)</p>
+    {% endif %}
+  </div>
+  <div class="ymyl-hero-blocks">
+    {% for bid, name in blocks.items() %}
+    {% set bs = block_stats.get(bid, {}) %}
+    <div class="ymyl-block-chip" data-block="{{ bid }}">
+      <span class="ymyl-block-id">{{ bid }}</span>
+      <span class="ymyl-block-name">{{ name }}</span>
+      <span class="ymyl-block-counts">
+        {% if bs.fail %}<span class="bc-fail">{{ bs.fail }}❌</span>{% endif %}
+        {% if bs.warn %}<span class="bc-warn">{{ bs.warn }}⚠️</span>{% endif %}
+        {% if bs.pass %}<span class="bc-pass">{{ bs.pass }}✅</span>{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="tabs-sub">
+  <a href="/eeat">E-E-A-T</a>
+  <a href="/ymyl" class="active">YMYL</a>
+  <a href="/ymyl-library">⚠️ YMYL Library</a>
+  <a href="/library">📚 Источники</a>
+</div>
+
+{% if critical_insights %}
+<section class="ymyl-harm-panel">
+  <h3 class="ymyl-section-title">🚨 Критичные harm gaps (из библиотеки)</h3>
+  <div class="ymyl-insight-grid">
+    {% for ins in critical_insights %}
+    <article class="ymyl-insight-card pri-{{ ins.severity }}">
+      <div class="ymyl-insight-top">
+        <span class="prio prio-{{ ins.severity }}">{{ ins.severity }}</span>
+        <span class="src-tag">{{ harm_labels.get(ins.harm_category, ins.harm_category) }}</span>
+      </div>
+      <h4>{{ ins.title }}</h4>
+      <p>{{ ins.recommendation[:160] }}{% if ins.recommendation|length > 160 %}…{% endif %}</p>
+      {% if ins.document_url %}
+      <a class="ymyl-doc-link" href="{{ ins.document_url }}" target="_blank" rel="noopener">📎 {{ ins.document_title }}</a>
+      {% endif %}
+      <div class="ymyl-criteria-tags">
+        {% for cid in ins.criteria_ids %}
+        <a class="ymyl-crit-tag" href="#card-{{ cid }}">{{ cid }}</a>
+        {% endfor %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="ymyl-scenarios">
+  <h3 class="ymyl-section-title">Harm Scenarios (QRG §2.3 + библиотека)</h3>
+  <table class="ymyl-scenario-table">
+    <thead>
+      <tr>
+        <th>Сценарий</th><th>Вероятность</th><th>Вред</th><th>Mitigation</th><th>Критерии</th><th>Документ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sc in harm_scenarios %}
+      <tr>
+        <td><strong>{{ sc.title }}</strong></td>
+        <td><span class="ymyl-likelihood lik-{{ sc.likelihood }}">{{ sc.likelihood }}</span></td>
+        <td><span class="prio prio-{{ sc.severity }}">{{ sc.severity }}</span></td>
+        <td>{{ sc.mitigation }}</td>
+        <td>{% for c in sc.criteria_ids %}<a href="#card-{{ c }}" class="ymyl-crit-tag">{{ c }}</a>{% endfor %}</td>
+        <td><a href="/ymyl-library?tab=library&doc={{ sc.library_doc_id }}">{{ sc.library_doc_id }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<div class="toolbar">
+  <select class="btn" id="page-select">
+    {% for p in pages %}
+    <option value="{{ loop.index0 }}">{{ p.label }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn primary" id="btn-run">Запустить YMYL аудит</button>
+  <button class="btn" id="btn-ai-research" title="Perplexity: harm prevention + regulatory verify">🔍 AI Research</button>
+  <input class="search" id="search" placeholder="Поиск критерия YY…" />
+</div>
+
+<div class="filters" id="block-filters">
+  <span class="chip active" data-block="all">Все блоки</span>
+  {% for bid, name in blocks.items() %}
+  <span class="chip" data-block="{{ bid }}">{{ bid }} · {{ name }}</span>
+  {% endfor %}
+</div>
+
+<div class="filters" id="status-filters">
+  <span class="chip active" data-status="all">Все</span>
+  <span class="chip" data-status="fail">❌ Fail</span>
+  <span class="chip" data-status="warn">⚠️ Warn</span>
+  <span class="chip" data-status="pass">✅ Pass</span>
+  <span class="chip" data-status="manual">⏳ Manual</span>
+</div>
+
+<div class="grid" id="cards">
+  {% for item in display_items %}
+  <article class="card ymyl-card" id="card-{{ item.id }}" data-block="{{ item.block }}" data-status="{{ item.status }}"
+           data-title="{{ item.title|lower }} {{ item.id|lower }}">
+    <span class="badge {{ item.status }}">{{ item.status|ru_status }}</span>
+    <div class="card-id">#{{ item.id }} · {{ item.scope }}</div>
+    <div class="card-block">{{ item.block }} · {{ item.block_name }}</div>
+    <div class="card-title"><span class="sev {{ item.severity }}"></span>{{ item.title }}</div>
+    {% if item.source %}<div class="source-link">📎 {{ item.source }}</div>{% endif %}
+    {% if item.library_docs %}
+    <div class="ymyl-card-docs">
+      {% for doc in item.library_docs[:3] %}
+      <a class="ymyl-doc-pill" href="/ymyl-library?tab=library&doc={{ doc.id }}" title="{{ doc.title }}"
+         onclick="event.stopPropagation()">{{ doc.id.replace('YMYL-', '') }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <script type="application/json" class="card-data">{{ item|tojson }}</script>
+  </article>
+  {% endfor %}
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal modal--wide">
+    <h2 id="m-title"></h2>
+    <div class="meta" id="m-meta"></div>
+    <p id="m-source" class="modal-source"></p>
+    <p id="m-how" class="modal-how"></p>
+    <div id="m-library" class="ymyl-modal-library"></div>
+    <div class="evidence" id="m-evidence"></div>
+    <button class="btn modal-close" onclick="closeModal()">Закрыть</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const API_PATH = '/api/check/ymyl';
+  let activeBlock = 'all', activeStatus = 'all';
+
+  document.querySelectorAll('#block-filters .chip').forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll('#block-filters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      activeBlock = el.dataset.block;
+      filterCards();
+    };
+  });
+  document.querySelectorAll('#status-filters .chip').forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll('#status-filters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      activeStatus = el.dataset.status;
+      filterCards();
+    };
+  });
+  document.querySelectorAll('.ymyl-block-chip').forEach(chip => {
+    chip.onclick = () => {
+      const bid = chip.dataset.block;
+      document.querySelectorAll('#block-filters .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.block === bid);
+      });
+      activeBlock = bid;
+      filterCards();
+      document.getElementById('cards').scrollIntoView({ behavior: 'smooth' });
+    };
+  });
+
+  document.getElementById('search').oninput = filterCards;
+
+  function filterCards() {
+    const q = document.getElementById('search').value.toLowerCase();
+    document.querySelectorAll('#cards .card').forEach(card => {
+      const ok = (activeBlock === 'all' || card.dataset.block === activeBlock)
+        && (activeStatus === 'all' || card.dataset.status === activeStatus)
+        && (!q || card.dataset.title.includes(q));
+      card.classList.toggle('hidden', !ok);
+    });
+  }
+
+  function renderLibrarySection(d) {
+    const el = document.getElementById('m-library');
+    let html = '';
+    if (d.library_insights && d.library_insights.length) {
+      html += '<h4 class="ymyl-modal-h4">Harm insights</h4>';
+      d.library_insights.forEach(ins => {
+        html += `<div class="ymyl-modal-insight pri-${ins.severity}"><strong>${ins.title}</strong><p>${ins.recommendation || ''}</p></div>`;
+      });
+    }
+    if (d.library_docs && d.library_docs.length) {
+      html += '<h4 class="ymyl-modal-h4">Документы библиотеки</h4><div class="ymyl-modal-docs">';
+      d.library_docs.forEach(doc => {
+        const href = `/ymyl-library?tab=library&doc=${encodeURIComponent(doc.id)}`;
+        html += `<a class="ymyl-doc-pill" href="${href}" target="_blank">${doc.id}</a> `;
+        if (doc.url) html += `<a href="${doc.url}" target="_blank" rel="noopener" class="small muted">↗</a> `;
+      });
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }
+
+  document.querySelectorAll('#cards .card').forEach(card => {
+    card.onclick = () => {
+      const d = JSON.parse(card.querySelector('.card-data').textContent);
+      document.getElementById('m-title').textContent = `#${d.id} — ${d.title}`;
+      document.getElementById('m-meta').textContent = `${d.block_name} · ${d.severity} · ${d.status}`;
+      document.getElementById('m-source').textContent = d.source ? 'Источник: ' + d.source : '';
+      document.getElementById('m-how').textContent = 'Как проверять: ' + d.how;
+      document.getElementById('m-evidence').textContent = d.evidence || '—';
+      renderLibrarySection(d);
+      document.getElementById('modal').classList.add('open');
+    };
+  });
+
+  function closeModal() { document.getElementById('modal').classList.remove('open'); }
+  document.getElementById('modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+
+  document.getElementById('btn-run').onclick = async () => {
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    btn.textContent = 'Аудит…';
+    try {
+      const headers = typeof apiHeaders === 'function' ? apiHeaders() : {};
+      const r = await fetch(API_PATH + '?page_index=' + document.getElementById('page-select').value, {
+        method: 'POST', headers,
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || d.error || 'HTTP ' + r.status);
+      if (d.error && !d.results) throw new Error(d.error);
+      location.reload();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Запустить YMYL аудит';
+    }
+  };
+
+  document.getElementById('btn-ai-research').onclick = async () => {
+    const btn = document.getElementById('btn-ai-research');
+    btn.disabled = true;
+    btn.textContent = 'AI Research… (1–3 мин)';
+    try {
+      const headers = typeof apiHeaders === 'function' ? apiHeaders() : {};
+      const r = await fetch('/api/check/ymyl/ai-research?page_index=' + document.getElementById('page-select').value, {
+        method: 'POST', headers,
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || d.error || 'HTTP ' + r.status);
+      const ai = d.ai_research || {};
+      if (ai.status !== 'ok') throw new Error(ai.error || 'AI research failed');
+      const ing = ai.ingest || {};
+      const docStats = ing.documents || {};
+      document.getElementById('m-title').textContent = 'AI YMYL Research';
+      document.getElementById('m-meta').textContent = [
+        ai.model, (ai.latency_ms || '') + ' ms',
+        docStats.added ? '+' + docStats.added + ' docs' : '',
+        ing.insights_added ? '+' + ing.insights_added + ' insights' : '',
+      ].filter(Boolean).join(' · ');
+      document.getElementById('m-source').textContent = 'Промпт: prompts/ymyl-research-prompt.md';
+      document.getElementById('m-how').textContent = 'Harm scenarios + YY01–YY28 audit + document registry';
+      document.getElementById('m-library').innerHTML = '';
+      let body = ai.executive_summary || '';
+      if (body && ai.review) body += '\n\n---\n\n';
+      body += ai.review || '—';
+      document.getElementById('m-evidence').textContent = body;
+      document.getElementById('modal').classList.add('open');
+    } catch (e) {
+      alert('Ошибка AI Research: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔍 AI Research';
+    }
+  };
+
+  if (location.hash && location.hash.startsWith('#card-')) {
+    const card = document.querySelector(location.hash);
+    if (card) card.click();
+  }
+</script>
+{% endblock %}

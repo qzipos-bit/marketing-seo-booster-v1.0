@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% set active = 'library' %}
+{% block title %}Библиотека аудита — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = 'Аудит / Библиотека' %}
+{% set page_title = 'Библиотека аудита' %}
+{% set page_subtitle = 'Источники E-E-A-T, YMYL и Google Leaks · AI: eeat-research-prompt.md · ymyl-research-prompt.md' %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="tabs-sub">
+  <a href="/eeat">E-E-A-T ({{ eeat_count }})</a>
+  <a href="/ymyl">YMYL ({{ ymyl_count }})</a>
+  <a href="/library" class="active">📚 Библиотека</a>
+  <a href="/eeat-library">📖 E-E-A-T Library</a>
+  <a href="/ymyl-library">⚠️ YMYL Library</a>
+  <a href="/leaks">🔓 Google Leaks</a>
+</div>
+<div class="lib-content">
+  {{ library_html|safe }}
+</div>
+{% endblock %}

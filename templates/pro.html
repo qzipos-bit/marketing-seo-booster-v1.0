@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% set active = 'pro' %}
+{% block title %}Pro SEO — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = 'Аудит / Pro-аудит' %}
+{% set page_title = 'Pro SEO — форумы & GEO 2026' %}
+{% set page_subtitle %}
+  AI-боты · заголовки безопасности · цепочки редиректов · дубли шаблонов · roadmap
+  {% if run and run.report %} · {{ run.report.base or run.base }}{% endif %}
+{% endset %}
+{% set page_actions %}
+  <button class="btn primary" id="btn-run-pro">Полный Pro-аудит</button>
+  <a class="btn" href="/api/pro/export.md" target="_blank" id="btn-export">Экспорт MD</a>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<div id="status" class="status-bar muted"></div>
+
+<div class="pro-grid">
+  <section class="pro-card">
+    <h2>🤖 Матрица AI-ботов</h2>
+    <p class="card-sub">Perplexity, Claude, GPT, Google-Extended, Applebot — robots.txt</p>
+    <table class="matrix" id="bot-matrix">
+      <thead><tr><th>Бот</th><th>Статус</th><th>Назначение</th></tr></thead>
+      <tbody>
+      {% if run and run.report and run.report.bot_access_flat %}
+        {% set bot_desc = {
+          'PerplexityBot': 'цитирование в Perplexity',
+          'ClaudeBot': 'Anthropic Claude',
+          'Anthropic-AI': 'обучение Anthropic',
+          'GPTBot': 'обучение OpenAI',
+          'ChatGPT-User': 'браузинг ChatGPT',
+          'Google-Extended': 'обучение Google AI',
+          'GoogleOther': 'вспомогательный Google',
+          'Applebot-Extended': 'Apple Intelligence',
+          'Googlebot': 'поиск Google',
+          'Bingbot': 'поиск Bing'
+        } %}
+        {% for bot, status in run.report.bot_access_flat.items() %}
+        <tr>
+          <td><code>{{ bot }}</code></td>
+          <td><span class="badge {{ status }}">{{ status|ru_status }}</span></td>
+          <td class="muted">{{ bot_desc.get(bot, '') }}</td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="3" class="muted">Запусти Pro-аудит</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+    {% if run and run.report and run.report.llms_txt %}
+    <div class="llms-box">
+      <strong>llms.txt:</strong>
+      {% if run.report.llms_txt.ok %}
+        <span class="badge allowed">есть</span>
+        <pre>{{ run.report.llms_txt.preview[:300] }}</pre>
+      {% else %}
+        <span class="badge blocked">отсутствует</span>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="pro-card">
+    <h2>🔒 Заголовки безопасности</h2>
+    <p class="card-sub">HSTS, CSP, X-Frame-Options — оценка securityheaders.com</p>
+    <ul class="header-list" id="sec-headers">
+    {% if run and run.report and run.report.security_headers %}
+      {% for h, v in run.report.security_headers.items() %}
+      <li>
+        <code>{{ h }}</code>
+        <span class="{{ 'ok' if v != '—' else 'miss' }}">{{ v[:70] if v != '—' else '— отсутствует' }}</span>
+      </li>
+      {% endfor %}
+    {% else %}
+      <li class="muted">—</li>
+    {% endif %}
+    </ul>
+  </section>
+
+  <section class="pro-card wide">
+    <h2>🔀 Цепочки редиректов</h2>
+    <p class="card-sub">Правило: ≤2 перехода, без петель, 301 для постоянных</p>
+    <div id="redirect-chains">
+    {% if run and run.report and run.report.redirect_chains %}
+      {% for url, chain in run.report.redirect_chains.items() %}
+      <div class="chain-block">
+        <div class="chain-url">{{ url }}</div>
+        <div class="chain-hops">
+          {% for hop in chain %}
+          <span class="hop">{{ hop.status }} → {{ hop.url[:50] }}{% if hop.location %} → {{ hop.location[:40] }}{% endif %}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">—</p>
+    {% endif %}
+    </div>
+  </section>
+
+  <section class="pro-card">
+    <h2>📋 Дубли шаблонов</h2>
+    <p class="card-sub">Скан нескольких страниц — массовые дубли title/description</p>
+    {% if run and run.report %}
+    {% if run.report.duplicate_titles %}
+    <h3 class="warn-title">Дубли title</h3>
+    <ul>{% for d in run.report.duplicate_titles %}<li>{{ d }}</li>{% endfor %}</ul>
+    {% else %}
+    <p class="ok-text">✓ Title уникальны на проверенных страницах</p>
+    {% endif %}
+    {% if run.report.duplicate_descriptions %}
+    <h3 class="warn-title">Дубли description</h3>
+    <ul>{% for d in run.report.duplicate_descriptions %}<li>{{ d }}</li>{% endfor %}</ul>
+    {% else %}
+    <p class="ok-text">✓ Description уникальны</p>
+    {% endif %}
+    {% else %}
+    <p class="muted">—</p>
+    {% endif %}
+  </section>
+
+  <section class="pro-card wide">
+    <h2>🎯 Roadmap по приоритетам</h2>
+    <p class="card-sub">P0 срочно → P3 полировка · из 145 критериев чеклиста</p>
+    <table class="roadmap" id="roadmap">
+      <thead><tr><th>Приор.</th><th>#</th><th>Блок</th><th>Проблема</th><th>Доказательство</th></tr></thead>
+      <tbody>
+      {% for item in roadmap[:40] %}
+      <tr class="pri-{{ item.priority }}">
+        <td><strong>{{ item.priority }}</strong></td>
+        <td>{{ item.id }}</td>
+        <td>{{ item.block }}</td>
+        <td>{{ item.title }}</td>
+        <td class="muted">{{ item.evidence[:120] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">Запусти Pro-аудит (включает чеклист 145)</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('btn-run-pro').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-run-pro');
+    const status = document.getElementById('status');
+    btn.disabled = true;
+    status.textContent = 'Pro-аудит: чеклист 145 + AI-матрица + безопасность… (~30–60 сек)';
+    try {
+      const r = await fetch('/api/check/pro', { method: 'POST' });
+      const data = await r.json();
+      if (data.error) {
+        status.textContent = 'Ошибка: ' + data.error;
+      } else {
+        status.textContent = 'Готово — перезагрузка…';
+        location.reload();
+      }
+    } catch (e) {
+      status.textContent = 'Ошибка: ' + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

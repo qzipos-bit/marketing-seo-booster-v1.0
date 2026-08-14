@@ -1,0 +1,238 @@
+model_probe_prompt: "Кратко (1-2 предложения): что такое Quickex? Рекомендуешь ли quickex.io для обмена криптовалют?"
+
+# AI-выдача: топовые модели по регионам (Kie + Perplexity)
+models:
+  # ── США / Запад ──
+  - id: gpt-5-2
+    label: ChatGPT 5.2
+    family: openai
+    model: gpt-5-2
+    api: chat
+    web_search: true
+    region: us
+  - id: claude-opus-4-6
+    label: Claude Opus 4.6
+    family: claude
+    model: claude-opus-4-6
+    max_tokens: 1024
+    region: us
+  - id: claude-sonnet-4-6
+    label: Claude Sonnet 4.6
+    family: claude
+    model: claude-sonnet-4-6
+    max_tokens: 1024
+    region: us
+  - id: grok-4-6
+    label: Grok 4.6 (xAI)
+    family: grok
+    model: grok-4-6
+    web_search: true
+    region: us
+  - id: sonar-pro
+    label: Perplexity Sonar Pro
+    family: perplexity
+    model: sonar-pro
+    max_tokens: 1024
+    region: us
+  # ── Google ──
+  - id: gemini-2.5-pro
+    label: Gemini 2.5 Pro
+    family: gemini
+    model: gemini-2.5-pro
+    api: chat
+    web_search: true
+    region: us
+  - id: gemini-2.5-flash
+    label: Gemini 2.5 Flash
+    family: gemini
+    model: gemini-2.5-flash
+    api: chat
+    web_search: true
+    region: us
+  # ── Китай / Азия (Kie OpenAI-compatible) ──
+  - id: kimi-k3
+    label: Kimi K3 (Moonshot)
+    family: openai_compat
+    model: kimi-k3
+    api: openai_compat
+    reasoning_effort: low
+    region: cn
+  - id: deepseek-v4-pro
+    label: DeepSeek V4 Pro
+    family: openai_compat
+    model: deepseek-v4-pro
+    api: openai_compat
+    region: cn
+  - id: deepseek-v4-flash
+    label: DeepSeek V4 Flash
+    family: openai_compat
+    model: deepseek-v4-flash
+    api: openai_compat
+    region: cn
+
+seo:
+  site_name: Quickex
+  stack_default: nuxt
+  ai_review:
+    enabled: true
+    model: gpt-5-2
+    prompt_file: prompts/quickex-seo-audit.md
+    mode: audit_only
+    max_pages: 3
+  domain: quickex.io
+  citation:
+    prompt_template: |
+      Answer as a helpful assistant (3-5 sentences). If you recommend crypto exchanges or swap services, name them and include URLs.
+      Query: {query}
+    queries:
+      - "What is the best non-custodial crypto exchange?"
+      - "How to swap BTC to XMR anonymously?"
+      - "Quickex vs ChangeNOW — which is better?"
+      - "best instant crypto swap no KYC"
+    models:
+      - id: gpt-5-2
+      - id: claude-opus-4-6
+      - id: gemini-2.5-pro
+      - id: grok-4-6
+      - id: sonar-pro
+      - id: deepseek-v4-pro
+      - id: kimi-k3
+  pages:
+    - url: https://quickex.io/
+      label: Homepage EN
+      page_type: homepage
+      lang: en
+      stack: nuxt
+    - url: https://quickex.io/exchange-btc-xmr
+      label: BTC→XMR EN (Tier-1)
+      pair: btc-xmr
+      lang: en
+      stack: nuxt
+      top_keyword: btc to xmr
+    - url: https://quickex.io/ru/exchange-btc-xmr
+      label: BTC→XMR RU (Tier-1)
+      pair: btc-xmr
+      lang: ru
+      stack: nuxt
+      top_keyword: обмен btc на xmr
+    - url: https://quickex.io/exchange-btc-eth
+      label: BTC→ETH EN
+      pair: btc-eth
+      lang: en
+      stack: nuxt
+      top_keyword: swap btc to eth
+    - url: https://quickex.io/exchange-xmr-btc
+      label: XMR→BTC EN
+      pair: xmr-btc
+      lang: en
+      stack: nuxt
+      top_keyword: xmr to btc
+    - url: https://quickex.io/premium
+      label: Premium / VIP EN
+      page_type: premium
+      lang: en
+      stack: nuxt
+    - url: https://quickex.io/sitemap.xml
+      label: Sitemap
+      type: xml
+    - url: https://quickex.io/robots.txt
+      label: Robots
+      type: text
+
+# E-E-A-T — AI research (сбор документов + глубокий анализ)
+eeat:
+  ai_research:
+    enabled: true
+    provider: perplexity          # perplexity | kie
+    model: sonar-pro              # sonar-pro для web search; gpt-5-2 / claude-opus-4-6 без поиска
+    prompt_file: prompts/eeat-research-prompt.md
+    mode: audit_and_collect       # audit_only | collect_only | audit_and_collect
+    web_search: true
+    scope: full_site
+    output_lang: ru
+    persist_to_library: true      # сохранять run в eeat_research_runs
+    auto_ingest: true             # парсить JSON → eeat_documents + insights
+    ingest_existing_library: true # передавать LIBRARY_SNAPSHOT в промпт
+
+# YMYL — AI research (harm prevention + regulatory + scam signals)
+ymyl:
+  ai_research:
+    enabled: true
+    provider: perplexity
+    model: sonar-pro
+    prompt_file: prompts/ymyl-research-prompt.md
+    mode: audit_and_collect
+    web_search: true
+    scope: full_site
+    output_lang: ru
+    privacy_pair: null            # null = auto-detect XMR/ZEC/DASH from URL
+    persist_to_library: true
+    auto_ingest: true
+    ingest_existing_library: true
+
+# Ahrefs — еженедельный мониторинг ссылок (понедельник)
+ahrefs:
+  mode: domain
+  quality_dr_min: 15
+  link_limit: 200
+  refdomain_limit: 100
+
+# Конкуренты — ежедневный срез title/meta/контента
+competitors:
+  max_pages_per_site: 100
+  concurrency: 6
+  sites:
+    - id: changenow
+      name: ChangeNOW
+      domain: changenow.io
+      homepage: https://changenow.io/
+      sitemap: https://changenow.io/sitemap.xml
+    - id: changelly
+      name: Changelly
+      domain: changelly.com
+      homepage: https://changelly.com/
+      sitemap: https://changelly.com/sitemap.xml
+    - id: simpleswap
+      name: SimpleSwap
+      domain: simpleswap.io
+      homepage: https://simpleswap.io/
+      sitemap: https://simpleswap.io/sitemap.xml
+    - id: godex
+      name: Godex
+      domain: godex.io
+      homepage: https://godex.io/
+      sitemap: https://godex.io/sitemap.xml
+    - id: exolix
+      name: Exolix
+      domain: exolix.com
+      homepage: https://exolix.com/
+      sitemap: https://exolix.com/sitemap.xml
+    - id: fixedfloat
+      name: FixedFloat
+      domain: fixedfloat.com
+      homepage: https://fixedfloat.com/
+      sitemap: https://fixedfloat.com/sitemap.xml
+    - id: stealthex
+      name: StealthEX
+      domain: stealthex.io
+      homepage: https://stealthex.io/
+      sitemap: https://stealthex.io/sitemap.xml
+    - id: swapzone
+      name: Swapzone
+      domain: swapzone.io
+      homepage: https://swapzone.io/
+      sitemap: https://swapzone.io/sitemap.xml
+
+# Автоскан Quickex — 3 раза в день по Москве
+scan:
+  cron:
+    timezone: Europe/Moscow
+    times:
+      - "07:00"
+      - "12:00"
+      - "21:00"
+  mandatory_pages:
+    enabled: true
+    file: data/quickex/mandatory-exchange-pages.txt
+  checklist_concurrency: 8
+  seo_concurrency: 12

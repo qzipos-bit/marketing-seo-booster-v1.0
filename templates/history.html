@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% set active = 'history' %}
+{% block title %}История сканов — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = product_full ~ ' / История' %}
+{% set page_title = 'Постоянный скрининг — ' ~ site_name ~ ((' (' ~ domain ~ ')') if domain else '') %}
+{% set page_subtitle = 'Автоскан ' ~ scan_schedule ~ ' · данные в SQLite data/monitor.db' %}
+{% set page_actions %}
+  <a href="/api/export/scan-history.csv" class="btn">CSV</a>
+  <button class="btn primary" onclick="runScanNow()">Запустить скан</button>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="stat-row">
+  <div class="stat-box">
+    <div class="val">{{ stats.total_scans }}</div>
+    <div class="lbl">Всего сканов</div>
+  </div>
+  <div class="stat-box">
+    <div class="val">{% if stats.last_scan and stats.last_scan.get('metrics') and stats.last_scan.metrics.get('checklist_score') is not none %}{{ stats.last_scan.metrics.checklist_score|round(1) }}%{% else %}—{% endif %}</div>
+    <div class="lbl">Последний SEO-балл</div>
+  </div>
+  <div class="stat-box">
+    <div class="val">{% if stats.last_scan %}{{ stats.last_scan.metrics.get('checklist_grade') or '—' }}{% else %}—{% endif %}</div>
+    <div class="lbl">Grade</div>
+  </div>
+  <div class="stat-box">
+    <div class="val">{% if stats.last_scan %}{{ stats.last_scan.finished_at[:16] if stats.last_scan.finished_at else '—' }}{% else %}—{% endif %}</div>
+    <div class="lbl">Последний скан</div>
+  </div>
+</div>
+
+{% if trends %}
+<h3 class="section-title">Тренд checklist score ({{ trends|length }} точек)</h3>
+<div class="trend-chart">
+  {% for t in trends %}
+  {% set h = ((t.checklist_score or 0) * 0.8) %}
+  <div class="trend-bar" style="height:{{ h if h > 4 else 4 }}px">
+    <span class="tip">{% if t.checklist_score is not none %}{{ t.checklist_score|round(1) }}%{% else %}—{% endif %} · {{ (t.at or '')[:10] }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<table class="matrix">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Время</th>
+      <th>Триггер</th>
+      <th>SEO %</th>
+      <th>Grade</th>
+      <th>SEO avg</th>
+      <th>GEO</th>
+      <th>Pass</th>
+      <th>Fail</th>
+      <th>Боты</th>
+      <th>Статус</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in scans %}
+    {% set m = s.metrics or {} %}
+    <tr>
+      <td><a href="/api/scan/{{ s.id }}" target="_blank">{{ s.id }}</a></td>
+      <td>{{ (s.finished_at or s.started_at)[:19] }}</td>
+      <td class="trigger-{{ s.trigger }}">{{ s.trigger }}</td>
+      <td><strong>{{ m.get('checklist_score')|round(1) if m.get('checklist_score') is not none else '—' }}</strong></td>
+      <td>{{ m.get('checklist_grade') or '—' }}</td>
+      <td>{{ m.get('seo_avg_score') if m.get('seo_avg_score') is not none else '—' }}</td>
+      <td>{{ m.get('geo_avg_score') if m.get('geo_avg_score') is not none else '—' }}</td>
+      <td class="stat-val--pass">{{ m.get('pass', 0) }}</td>
+      <td class="stat-val--fail">{{ m.get('fail', 0) }}</td>
+      <td>{{ m.get('bot_mismatch', 0) }}</td>
+      <td><span class="badge {{ s.status }}">{{ s.status|ru_status }}</span></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="11" class="muted">История пуста — нажми «Запустить скан» или дождись автоскана ({{ scan_schedule }})</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

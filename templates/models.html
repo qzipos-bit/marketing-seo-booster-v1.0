@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% set active = 'models' %}
+{% block title %}Модели — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = 'Intel / AI-модели' %}
+{% set page_title = 'AI-выдача' %}
+{% set page_subtitle %}
+  {{ models|length }} моделей · US + CN + Perplexity · проверка цитирования Quickex
+{% endset %}
+{% set page_actions %}
+  <button class="btn primary" id="btn-run">Проверить все модели</button>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+{% if probe_prompt %}
+<p class="prompt-box"><strong>Промпт:</strong> {{ probe_prompt }}</p>
+{% endif %}
+<p class="msb-page-meta prompt-box--sm">Kie: Claude, Grok, Gemini, DeepSeek, Kimi · Perplexity: отдельный ключ <code>PERPLEXITY_API_KEY</code></p>
+
+{% if run and run.summary %}
+<section class="hero">
+  <div class="stats">
+    <div class="stat"><div class="val stat-val--pass">{{ run.summary.ok }}</div><div class="lbl">OK</div></div>
+    <div class="stat"><div class="val stat-val--fail">{{ run.summary.fail }}</div><div class="lbl">Ошибки</div></div>
+    <div class="stat"><div class="val">{{ run.summary.credit or '—' }}</div><div class="lbl">Кредиты</div></div>
+  </div>
+</section>
+{% endif %}
+
+<div class="filters" id="family-filters">
+  <span class="chip active" data-family="all">Все провайдеры</span>
+  {% for fam in families %}
+  <span class="chip" data-family="{{ fam }}">{{ fam }}</span>
+  {% endfor %}
+</div>
+
+<div class="filters" id="status-filters">
+  <span class="chip active" data-status="all">Все статусы</span>
+  <span class="chip" data-status="ok">ок</span>
+  <span class="chip" data-status="fail">ошибка</span>
+  <span class="chip" data-status="pending">ожидание</span>
+</div>
+
+<input class="search search--full" id="search" placeholder="Поиск: chatgpt, claude, perplexity, deepseek, kimi…" />
+
+<div class="model-grid" id="model-grid">
+  {% for m in models %}
+  {% set r = results_map.get(m.id) %}
+  <article class="model-card" data-family="{{ m.family }}" data-status="{{ r.status if r else 'pending' }}"
+           data-name="{{ m.label|lower }} {{ m.id|lower }}">
+    <div class="model-card-top">
+      <span class="provider-badge {{ m.family }}">{{ m.family }}</span>
+      <span class="badge {{ r.status if r else 'na' }}">{{ (r.status if r else 'pending')|ru_status }}</span>
+    </div>
+    <h3>{{ m.label }}</h3>
+    <div class="model-id">{{ m.id }}{% if m.region %} · {{ m.region|upper }}{% endif %}</div>
+    {% if r %}
+    <div class="model-meta">
+      <span>{{ r.latency_ms or '—' }} мс</span>
+      {% if r.credits %}<span>{{ r.credits }} кр.</span>{% endif %}
+    </div>
+    <div class="model-response">
+      {% if r.response_full %}
+        {{ r.response_full }}
+      {% elif r.response_preview %}
+        {{ r.response_preview }}
+      {% elif r.error %}
+        <span class="err">{{ r.error }}</span>
+      {% else %}—{% endif %}
+    </div>
+    {% else %}
+    <div class="model-meta muted">Ещё не проверялась</div>
+    <div class="model-response muted">Нажми «Проверить все модели»</div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let activeFamily = 'all', activeStatus = 'all';
+  document.querySelectorAll('#family-filters .chip').forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll('#family-filters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      activeFamily = el.dataset.family;
+      filterCards();
+    };
+  });
+  document.querySelectorAll('#status-filters .chip').forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll('#status-filters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      activeStatus = el.dataset.status;
+      filterCards();
+    };
+  });
+  document.getElementById('search').oninput = filterCards;
+
+  function filterCards() {
+    const q = document.getElementById('search').value.toLowerCase();
+    document.querySelectorAll('.model-card').forEach(card => {
+      const okF = activeFamily === 'all' || card.dataset.family === activeFamily;
+      const okS = activeStatus === 'all' || card.dataset.status === activeStatus;
+      const okQ = !q || card.dataset.name.includes(q);
+      card.classList.toggle('hidden', !(okF && okS && okQ));
+    });
+  }
+
+  document.getElementById('btn-run').onclick = async () => {
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    btn.textContent = 'Проверяю…';
+    try {
+      const res = await fetch('/api/check/models', { method: 'POST' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      location.reload();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Проверить все модели';
+    }
+  };
+</script>
+{% endblock %}

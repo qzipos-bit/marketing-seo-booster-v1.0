@@ -1,0 +1,64 @@
+.lab-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.lab-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.lab-card.wide { grid-column: 1 / -1; }
+
+.lab-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.lab-head h2 { margin: 0; font-size: 1rem; }
+
+.lab-toolbar { display: flex; gap: 8px; }
+
+.btn.sm { padding: 6px 12px; font-size: 0.82rem; }
+
+.status-bar {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  color: var(--muted);
+  min-height: 20px;
+}
+
+.lab-body { font-size: 0.85rem; margin-top: 10px; }
+.lab-body ul { margin: 8px 0; padding-left: 18px; }
+.lab-body li { margin: 4px 0; }
+
+.mini-stats { display: flex; gap: 16px; margin-bottom: 10px; }
+.mini-stats .ok { color: var(--pass); }
+.mini-stats .fail { color: var(--fail); }
+
+.sev-critical { color: var(--fail); }
+.sev-warning { color: var(--warn); }
+.sev-info { color: var(--muted); }
+
+.grade.A, .grade.B { color: var(--pass); }
+.grade.C, .grade.D { color: var(--warn); }
+.grade.F { color: var(--fail); }
+
+.badge.ok { background: rgba(34,197,94,.15); color: var(--pass); }
+.badge.warn, .badge.mismatch, .badge.challenge { background: rgba(245,158,11,.15); color: var(--warn); }
+.badge.fail, .badge.blocked, .badge.error { background: rgba(239,68,68,.15); color: var(--fail); }
+
+.warn { color: var(--warn); }
+
+@media (max-width: 900px) {
+  .lab-grid { grid-template-columns: 1fr; }
+}

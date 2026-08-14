@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% set active = 'competitors' %}
+{% block title %}Конкуренты — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = product_full ~ ' / Конкуренты' %}
+{% set page_title = 'Мониторинг конкурентов — ' ~ (sites|length) ~ ' сайтов' %}
+{% set page_subtitle %}
+  Ежедневно в {{ competitor_cron_hour }}:00 UTC · до 100 страниц на сайт · title, description, H1, контент, новые посадочные
+  {% if run %}· последний срез {{ run.started_at[:16].replace('T',' ') }} UTC{% endif %}
+{% endset %}
+{% set page_actions %}
+  <button class="btn primary" id="btn-comp-run">↻ Срез сейчас</button>
+  <a class="btn{% if not run %} btn--disabled{% endif %}" href="/api/export/competitors-changes.csv">⬇ CSV изменений</a>
+  <a class="btn{% if not run %} btn--disabled{% endif %}" href="/api/export/competitors-all.csv">⬇ Все страницы</a>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+{% set s = run.summary if run else {} %}
+{% set max_per_site = s.max_pages_per_site or 100 %}
+<div class="comp-stats">
+  <div class="comp-stat"><div class="val">{{ s.pages_scanned or '—' }}</div><div class="lbl">Страниц всего</div></div>
+  <div class="comp-stat"><div class="val">{{ max_per_site }}</div><div class="lbl">Лимит / сайт</div></div>
+  <div class="comp-stat"><div class="val stat-val--fail">{{ s.changes_total or 0 }}</div><div class="lbl">Изменений</div></div>
+  <div class="comp-stat"><div class="val stat-val--pass">{{ s.new_landings or 0 }}</div><div class="lbl">Новых лендингов</div></div>
+  <div class="comp-stat"><div class="val stat-val--warn">{{ s.title_changes or 0 }}</div><div class="lbl">Title</div></div>
+  <div class="comp-stat"><div class="val">{{ s.desc_changes or 0 }}</div><div class="lbl">Description</div></div>
+</div>
+
+<div class="comp-filters">
+  <a href="/competitors" class="{% if not filter_comp %}active{% endif %}">Все</a>
+  {% for site in sites %}
+  <a href="/competitors?competitor={{ site.id }}" class="{% if filter_comp == site.id %}active{% endif %}" title="Скачать CSV">{{ site.name }}</a>
+  {% endfor %}
+</div>
+
+{% if run and not filter_comp %}
+<div class="comp-export-row">
+  {% for site in sites %}
+  <a class="btn btn--sm" href="/api/export/competitors/{{ site.id }}.csv">⬇ {{ site.name }} (до {{ max_per_site }})</a>
+  {% endfor %}
+</div>
+{% elif run and filter_comp %}
+<div class="comp-export-row">
+  <a class="btn btn--sm" href="/api/export/competitors/{{ filter_comp }}.csv">⬇ Скачать CSV — {{ snapshots|length }} страниц</a>
+</div>
+{% endif %}
+
+{% set new_landings = changes | selectattr('change_type', 'equalto', 'new_landing') | list %}
+{% if new_landings %}
+<h3 class="section-title">🆕 Новые страницы ({{ new_landings|length }})</h3>
+<div class="table-wrap">
+  <table class="changes-table">
+    <thead>
+      <tr>
+        <th>Конкурент</th>
+        <th>URL</th>
+        <th>Title</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in new_landings %}
+      <tr class="new-landing">
+        <td><strong>{{ c.competitor_name or c.competitor_id }}</strong></td>
+        <td class="cell-url"><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.path or c.url }}</a></td>
+        <td class="cell-title">{{ c.title|truncate(60) if c.title else '—' }}</td>
+        <td>{{ c.meta_description|truncate(80) if c.meta_description else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% set other_changes = changes | rejectattr('change_type', 'equalto', 'new_landing') | list %}
+{% if other_changes %}
+<h3 class="section-title">🔔 Прочие изменения с прошлого среза</h3>
+<div class="table-wrap">
+  <table class="changes-table">
+    <thead>
+      <tr>
+        <th>Конкурент</th>
+        <th>Тип</th>
+        <th>URL</th>
+        <th>Title сейчас</th>
+        <th>Было → Стало</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in other_changes %}
+      <tr class="{% if c.change_type == 'page_removed' %}removed{% else %}changed{% endif %}">
+        <td><strong>{{ c.competitor_name or c.competitor_id }}</strong></td>
+        <td><span class="ctype ctype-{{ c.change_type }}">{{ c.change_type }}</span></td>
+        <td class="cell-url"><a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.path or c.url }}</a></td>
+        <td class="cell-title">{{ c.title|truncate(60) if c.title else '—' }}</td>
+        <td>
+          {% if c.before_val %}<span class="diff-before">{{ c.before_val|truncate(80) }}</span>{% endif %}
+          {% if c.after_val %}<span class="diff-after">{{ c.after_val|truncate(80) }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% elif run and not new_landings %}
+<div class="empty-state">
+  <p>✅ Изменений не обнаружено — конкуренты не меняли title/description/контент с прошлого среза.</p>
+  <p class="small">Проверено {{ s.pages_scanned }} страниц по {{ s.sites }} сайтам (до {{ max_per_site }} на сайт).</p>
+</div>
+{% elif not run %}
+<div class="empty-state">
+  <p>Ещё нет срезов. Нажми <strong>«Срез сейчас»</strong> — первый проход создаст baseline (~10–15 мин на 800 страниц).</p>
+  <p class="small">Со второго среза начнут подсвечиваться изменения. Новые страницы отслеживаются по историческому реестру URL.</p>
+</div>
+{% endif %}
+
+{% if snapshots %}
+<h3 class="section-title leaks-section-title">Снимок страниц ({{ snapshots|length }})</h3>
+<div class="table-wrap table-wrap--scroll">
+  <table class="changes-table">
+    <thead><tr><th>Сайт</th><th>Path</th><th>Title</th><th>Description</th><th>Слов</th><th>Статус</th></tr></thead>
+    <tbody>
+      {% for p in snapshots %}
+      <tr class="{% if p.is_new %}new-landing{% elif p.has_changes %}changed{% endif %}">
+        <td>{{ p.competitor_name }}</td>
+        <td><a href="{{ p.url }}" target="_blank">{{ p.path }}</a></td>
+        <td>{{ p.title|truncate(50) if p.title else '—' }}</td>
+        <td>{{ p.meta_description|truncate(60) if p.meta_description else '—' }}</td>
+        <td>{{ p.word_count }}</td>
+        <td>{% if p.is_new %}<span class="ctype ctype-new_landing">new</span>{% elif p.has_changes %}<span class="ctype ctype-content_changed">changed</span>{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if history %}
+<div class="hist">
+  <strong>История:</strong>
+  {% for h in history[:5] %}
+    #{{ h.id }} {{ h.started_at[:10] }} — {{ h.summary.changes_total or 0 if h.summary else 0 }} изм., {{ h.summary.pages_scanned or 0 if h.summary else 0 }} стр.
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('btn-comp-run')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-comp-run');
+    btn.disabled = true;
+    btn.textContent = 'Сканирую конкурентов… (10–15 мин)';
+    try {
+      const headers = typeof apiHeaders === 'function' ? apiHeaders() : {};
+      const r = await fetch('/api/competitors/run', { method: 'POST', headers });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || d.detail || 'HTTP ' + r.status);
+      location.reload();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '↻ Срез сейчас';
+    }
+  });
+</script>
+{% endblock %}

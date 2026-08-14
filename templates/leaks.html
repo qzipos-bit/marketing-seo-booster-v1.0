@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% set active = 'leaks' %}
+{% block title %}Google Leaks — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = product_full ~ ' / Google Leaks' %}
+{% set page_title = 'Сливы Google + рекомендации по аудиту — ' ~ site_name %}
+{% set page_actions %}
+  <a class="btn" href="/api/export/leaks-recommendations.md">📄 Экспорт MD</a>
+  <a class="btn" href="/api/leaks/recommendations">API JSON</a>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="leak-stats">
+  <div class="leak-stat"><div class="val">{{ stats.documents }}</div><div class="lbl">Документов</div></div>
+  <div class="leak-stat"><div class="val">{{ stats.rules }}</div><div class="lbl">Правил</div></div>
+  <div class="leak-stat leak-stat--accent"><div class="val">{{ rec_data.audit_summary.mapped }}</div><div class="lbl">Совпадений с аудитом</div></div>
+  <div class="leak-stat"><div class="val">{{ rec_data.audit_summary.total_issues }}</div><div class="lbl">Проблем в аудите</div></div>
+</div>
+
+<div class="tabs-sub leak-tabs">
+  <a href="/leaks?tab=recommendations" class="{% if tab == 'recommendations' %}active{% endif %}">🎯 Рекомендации</a>
+  <a href="/leaks?tab=library" class="{% if tab == 'library' %}active{% endif %}">📚 Библиотека файлов</a>
+  <a href="/leaks?tab=rules" class="{% if tab == 'rules' %}active{% endif %}">⚙️ Правила ({{ stats.rules }})</a>
+</div>
+
+{% if tab == 'recommendations' %}
+<section>
+  {% if rec_data.audit_summary.hint %}
+  <div class="hint-box">💡 {{ rec_data.audit_summary.hint }}</div>
+  {% endif %}
+
+  <p class="msb-page-meta">
+    На основе последних результатов
+    {% if rec_data.audit_summary.sources.checklist %}<span class="src-tag">Checklist</span>{% endif %}
+    {% if rec_data.audit_summary.sources.eeat %}<span class="src-tag">EEAT</span>{% endif %}
+    {% if rec_data.audit_summary.sources.ymyl %}<span class="src-tag">YMYL</span>{% endif %}
+    {% if rec_data.audit_summary.sources.pro %}<span class="src-tag">Pro</span>{% endif %}
+    — сопоставлено с правилами из Content Warehouse leak, QRG и antitrust trial.
+  </p>
+
+  {% if rec_data.recommendations %}
+    {% for rec in rec_data.recommendations %}
+    <article class="rec-card pri-{{ rec.priority }}">
+      <div class="rec-top">
+        <span class="prio prio-{{ rec.priority }}">{{ rec.priority }}</span>
+        <span class="src-tag">{{ rec.audit_source }} · {{ rec.audit_id }}</span>
+        <span class="leak-tag">{{ rec.rule_id }}</span>
+        <span class="rec-status">{{ rec.audit_status }}</span>
+      </div>
+      <h3 class="rec-title">{{ rec.audit_title }}</h3>
+      <div class="rec-action"><strong>Делай:</strong> {{ rec.action }}</div>
+      <div class="rec-meta">
+        <strong>Leak:</strong> {{ rec.leak_attributes }} ·
+        <em>Google: «{{ rec.google_public }}»</em> →
+        <strong>Leak:</strong> {{ rec.leak_evidence }}<br>
+        <strong>Источник:</strong>
+        <a href="{{ rec.document_url }}" target="_blank" rel="noopener">{{ rec.document_title }}</a>
+        {% if rec.audit_evidence %}<br><strong>Evidence:</strong> {{ rec.audit_evidence }}{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  {% else %}
+    <div class="empty">
+      <p>Нет сопоставленных рекомендаций.</p>
+      <p>Запусти <a href="/eeat">E-E-A-T</a>, <a href="/ymyl">YMYL</a> или <a href="/checklist">Checklist</a> — затем вернись сюда.</p>
+    </div>
+  {% endif %}
+
+  {% if rec_data.unmapped_roadmap %}
+  <h3 class="leaks-section-title">Дополнительно из roadmap (без привязки к leak)</h3>
+  {% for item in rec_data.unmapped_roadmap[:8] %}
+  <div class="rec-card pri-{{ item.priority }}">
+    <span class="prio prio-{{ item.priority }}">{{ item.priority }}</span>
+    <strong>{{ item.id }}</strong> — {{ item.title }}
+    <div class="rec-meta">{{ item.evidence }}</div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</section>
+
+{% elif tab == 'library' %}
+<section>
+  {% if selected_doc %}
+  <p><a href="/leaks?tab=library">← Все документы</a></p>
+  <div class="lib-content">{{ doc_html|safe }}</div>
+  {% else %}
+  <div class="doc-grid">
+    {% for doc in documents %}
+    <a class="doc-card" href="/leaks?tab=library&doc={{ doc.id }}">
+      <span class="cred">{{ credibility_labels.get(doc.credibility, doc.credibility) }}</span>
+      <h4>{{ doc.title }}</h4>
+      <p>{{ doc.summary }}</p>
+      <p class="doc-card-meta">{{ doc.published }} · {{ category_labels.get(doc.category, doc.category) }}</p>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+
+{% elif tab == 'rules' %}
+<section>
+  <table class="rules-table">
+    <thead>
+      <tr><th>ID</th><th>Правило</th><th>Категория</th><th>Severity</th><th>Attributes</th><th>Audit triggers</th></tr>
+    </thead>
+    <tbody>
+      {% for rule in rules %}
+      <tr>
+        <td><code>{{ rule.id }}</code></td>
+        <td>
+          <strong>{{ rule.name }}</strong><br>
+          <span class="small muted">{{ rule.recommendation[:80] }}…</span>
+        </td>
+        <td>{{ category_labels.get(rule.category, rule.category) }}</td>
+        <td>{{ rule.severity }}</td>
+        <td class="small">{{ rule.leak_attributes }}</td>
+        <td class="small">{{ rule.audit_triggers|join(', ') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

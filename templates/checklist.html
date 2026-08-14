@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% set active = 'checklist' %}
+{% block title %}SEO Чеклист — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = 'Аудит / Чеклист' %}
+{% set page_title = 'Quickex — SEO Чеклист' %}
+{% set page_subtitle %}
+  145 критериев (100 SEO + 20 Nuxt + 25 Pro) ·
+  {% if run %}{{ run.label }} · {{ run.url }}{% if run.summary and run.summary.is_nuxt %} · Nuxt ✓{% endif %}{% else %}Запусти проверку{% endif %}
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="stats" id="stats">
+    {% if run and run.summary %}
+    <div class="grade {{ run.summary.grade }}">{{ run.summary.grade }}</div>
+    <div class="stat"><div class="val">{{ run.summary.score }}%</div><div class="lbl">Балл</div></div>
+    <div class="stat"><div class="val stat-val--pass">{{ run.summary.counts.pass }}</div><div class="lbl">Пройдено</div></div>
+    <div class="stat"><div class="val stat-val--warn">{{ run.summary.counts.warn }}</div><div class="lbl">Предупр.</div></div>
+    <div class="stat"><div class="val stat-val--fail">{{ run.summary.counts.fail }}</div><div class="lbl">Ошибки</div></div>
+    <div class="stat"><div class="val stat-val--manual">{{ run.summary.counts.manual }}</div><div class="lbl">Вручную</div></div>
+    {% else %}
+    <div class="grade F">—</div>
+    {% endif %}
+  </div>
+</section>
+
+<div class="toolbar">
+  <select class="btn" id="page-select">
+    {% for p in pages %}
+    <option value="{{ loop.index0 }}" data-url="{{ p.url }}">{{ p.label }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn primary" id="btn-run">Запустить аудит</button>
+  <input class="search" id="search" placeholder="Поиск: canonical, H1, hreflang…" />
+</div>
+
+<div class="filters" id="block-filters">
+  <span class="chip active" data-block="all">Все блоки</span>
+  {% for bid, name in blocks.items() %}
+  <span class="chip" data-block="{{ bid }}">{{ bid }} · {{ name }}</span>
+  {% endfor %}
+</div>
+
+<div class="filters" id="status-filters">
+  <span class="chip active" data-status="all">Все статусы</span>
+  <span class="chip" data-status="pass">✅ Пройдено</span>
+  <span class="chip" data-status="warn">⚠️ Предупр.</span>
+  <span class="chip" data-status="fail">❌ Ошибка</span>
+  <span class="chip" data-status="manual">🔵 Вручную</span>
+  <span class="chip" data-status="na">➖ Н/Д</span>
+</div>
+
+{% if run and run.summary and run.summary.blocks %}
+<div class="blocks-row" id="block-stats">
+  {% for bid, st in run.summary.blocks.items() %}
+  <div class="block-pill">
+    <span class="lbl">{{ bid }} · {{ st.name }}</span>
+    <strong>{{ st.pass }}✓ {{ st.fail }}✗</strong>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid" id="cards">
+  {% if run and run.results %}
+    {% for item in run.results %}
+    <article class="card" data-id="{{ item.id }}" data-block="{{ item.block }}" data-status="{{ item.status }}"
+             data-title="{{ item.title|lower }}" data-sev="{{ item.severity }}">
+      <span class="badge {{ item.status }}">{{ item.status|ru_status }}</span>
+      <div class="card-id">#{{ item.id }} · {{ item.scope }}</div>
+      <div class="card-block">{{ item.block }} · {{ item.block_name }}</div>
+      <div class="card-title">
+        <span class="sev {{ item.severity }}"></span>{{ item.title }}
+      </div>
+      <script type="application/json" class="card-data">{{ item|tojson }}</script>
+    </article>
+    {% endfor %}
+  {% else %}
+    <div class="empty empty--grid">
+      Нет данных. Выбери страницу и нажми «Запустить аудит».
+    </div>
+  {% endif %}
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h2 id="m-title"></h2>
+    <div class="meta" id="m-meta"></div>
+    <p id="m-how" class="modal-how"></p>
+    <div class="evidence" id="m-evidence"></div>
+    <button class="btn modal-close" onclick="closeModal()">Закрыть</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const STATUS_RU = {pass:'пройдено',warn:'предупреждение',fail:'ошибка',manual:'вручную',na:'н/д'};
+  const SEV_RU = {critical:'критично',high:'высокий',medium:'средний',low:'низкий'};
+
+  let activeBlock = 'all';
+  let activeStatus = 'all';
+
+  document.querySelectorAll('#block-filters .chip').forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll('#block-filters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      activeBlock = el.dataset.block;
+      filterCards();
+    };
+  });
+  document.querySelectorAll('#status-filters .chip').forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll('#status-filters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      activeStatus = el.dataset.status;
+      filterCards();
+    };
+  });
+
+  document.getElementById('search').oninput = filterCards;
+
+  function filterCards() {
+    const q = document.getElementById('search').value.toLowerCase();
+    document.querySelectorAll('#cards .card').forEach(card => {
+      const okBlock = activeBlock === 'all' || card.dataset.block === activeBlock;
+      const okStatus = activeStatus === 'all' || card.dataset.status === activeStatus;
+      const okSearch = !q || card.dataset.title.includes(q) || card.dataset.id.includes(q);
+      card.classList.toggle('hidden', !(okBlock && okStatus && okSearch));
+    });
+  }
+
+  document.querySelectorAll('#cards .card').forEach(card => {
+    card.onclick = () => {
+      const data = JSON.parse(card.querySelector('.card-data').textContent);
+      document.getElementById('m-title').textContent = `#${data.id} — ${data.title}`;
+      document.getElementById('m-meta').textContent =
+        `${data.block_name} · ${SEV_RU[data.severity]||data.severity} · ${data.scope} · ${STATUS_RU[data.status]||data.status}`;
+      document.getElementById('m-how').textContent = 'Как проверить: ' + data.how;
+      document.getElementById('m-evidence').textContent = data.evidence || '—';
+      document.getElementById('modal').classList.add('open');
+    };
+  });
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+  }
+  document.getElementById('modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+
+  document.getElementById('btn-run').onclick = async () => {
+    const btn = document.getElementById('btn-run');
+    const idx = document.getElementById('page-select').value;
+    btn.disabled = true;
+    btn.textContent = 'Проверяю…';
+    try {
+      const res = await fetch('/api/check/checklist?page_index=' + idx, { method: 'POST' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      location.reload();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Запустить аудит';
+    }
+  };
+</script>
+{% endblock %}

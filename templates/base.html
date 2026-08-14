@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}{{ product_full }}{% endblock %}</title>
+  <link rel="icon" href="/static/seo-logo.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/msb.css" />
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  {% include 'partials/topbar.html' %}
+  <div class="msb-page">
+    {% block page_header %}{% endblock %}
+    <div class="msb-content">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

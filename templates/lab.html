@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% set active = 'lab' %}
+{% block title %}SEO Lab — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = 'Аудит / SEO Lab' %}
+{% set page_title = 'SEO Lab' %}
+{% set page_subtitle = '5 pro-фич из форумов и LinkedIn · тестируй по одной или все сразу' %}
+{% set page_actions %}
+  <select id="page-select" class="btn">
+    {% for p in pages %}
+    <option value="{{ loop.index0 }}">{{ p.label }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn primary" id="btn-all">▶ Запустить всё</button>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<div id="status" class="status-bar"></div>
+
+<div class="lab-grid">
+  <section class="lab-card" id="sec-bot">
+    <div class="lab-head">
+      <h2>🛡️ Проверка доступа ботов</h2>
+      <button class="btn sm" data-action="bot-reality">Запуск</button>
+    </div>
+    <p class="card-sub">robots.txt vs реальный HTTP (GPTBot, ClaudeBot…)</p>
+    <div class="lab-body" id="out-bot">
+    {% if bot_reality and bot_reality.payload %}
+      {% set p = bot_reality.payload %}
+      <div class="mini-stats">
+        <span class="ok">{{ p.summary.ok }} ок</span>
+        <span class="fail">{{ p.summary.mismatch }} расхождений</span>
+      </div>
+      <table class="matrix">
+        <tr><th>Бот</th><th>robots</th><th>HTTP</th><th>Вердикт</th></tr>
+        {% for r in p.results[:6] %}
+        <tr><td><code>{{ r.bot }}</code></td><td>{{ r.robots|ru_status }}</td><td>{{ r.http_status }}</td>
+        <td><span class="badge {{ r.verdict }}">{{ r.verdict|ru_verdict }}</span></td></tr>
+        {% endfor %}
+      </table>
+    {% else %}<p class="muted">Не запускалось</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="lab-card" id="sec-drift">
+    <div class="lab-head">
+      <h2>📉 SEO Drift Guard</h2>
+      <div>
+        <button class="btn sm" data-action="drift-baseline">Снимок</button>
+        <button class="btn sm" data-action="drift-compare">Сравнить</button>
+      </div>
+    </div>
+    <p class="card-sub">Git для SEO — diff после деплоя</p>
+    <div class="lab-body" id="out-drift">
+    {% if drift and drift.payload and drift.payload.changes is defined %}
+      {% set d = drift.payload %}
+      <p>Критично: <strong class="fail">{{ d.critical_count }}</strong> · Предупр.: {{ d.warning_count }}</p>
+      <ul>{% for c in d.changes[:5] %}<li class="sev-{{ c.severity }}">{{ c.message }}</li>{% endfor %}</ul>
+    {% elif drift_baselines %}
+      <p class="muted">Снимков: {{ drift_baselines|length }} · последний: {{ drift_baselines[0].url[:40] }}</p>
+    {% else %}<p class="muted">Сначала «Снимок», потом «Сравнить» после деплоя</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="lab-card wide" id="sec-cite">
+    <div class="lab-head">
+      <h2>🎯 AI Citation Radar</h2>
+      <button class="btn sm" data-action="citations" {% if not has_api_key %}disabled{% endif %}>Запуск (Kie)</button>
+    </div>
+    <p class="card-sub">Запросы покупателей → GPT/Claude/Gemini · кого цитируют</p>
+    <div class="lab-body" id="out-cite">
+    {% if citations and citations.payload and citations.payload.summary %}
+      {% set c = citations.payload %}
+      <div class="mini-stats">
+        <span>Доля цитирований: <strong>{{ c.summary.cite_rate_pct }}%</strong></span>
+        <span>{{ c.summary.cites_domain }}/{{ c.summary.total_probes }} проверок</span>
+      </div>
+      <table class="matrix">
+        <tr><th>Запрос</th><th>Модель</th><th>Цитирует?</th><th>Ответ</th></tr>
+        {% for r in c.results[:8] %}
+        <tr>
+          <td>{{ r.query[:35] }}…</td>
+          <td>{{ r.model_label }}</td>
+          <td>{% if r.cites_target_domain %}✅{% else %}—{% endif %}</td>
+          <td class="muted">{{ r.response_preview[:80] }}…</td>
+        </tr>
+        {% endfor %}
+      </table>
+    {% else %}<p class="muted">{% if not has_api_key %}Нужен KIE_API_KEY{% else %}Не запускалось{% endif %}</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="lab-card" id="sec-geo">
+    <div class="lab-head">
+      <h2>📊 GEO / Citability Score</h2>
+      <button class="btn sm" data-action="geo">Запуск</button>
+    </div>
+    <p class="card-sub">0–100: статистика, FAQ, таблицы, answer capsule</p>
+    <div class="lab-body" id="out-geo">
+    {% if geo and geo.payload and geo.payload.results %}
+      <div class="geo-score-summary">
+        <span class="geo-score-avg">{{ geo.payload.summary.avg_score|round(1) }}</span>
+        <span class="geo-score-avg-lbl">/100 средний</span>
+      </div>
+      <ul class="geo-score-list">
+        {% for r in geo.payload.results[:5] %}
+        <li class="geo-score-item">
+          <span class="grade-sm {{ r.grade }}" title="Grade {{ r.grade }}">{{ r.grade }}</span>
+          <div class="geo-score-meta">
+            <div class="geo-score-top">
+              <span class="geo-score-val">{{ r.score }}</span>
+              <span class="geo-score-dash">—</span>
+              <span class="geo-score-label">{{ r.label or r.url[:48] }}</span>
+            </div>
+            <div class="score-bar geo-score-bar"><span style="width: {{ r.score }}%"></span></div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}<p class="muted">Не запускалось</p>{% endif %}
+    </div>
+  </section>
+
+  <section class="lab-card" id="sec-render">
+    <div class="lab-head">
+      <h2>🔬 Render Gap Lab</h2>
+      <button class="btn sm" data-action="render-gap">Запуск</button>
+    </div>
+    <p class="card-sub">исходный HTML vs Playwright (Nuxt/SPA)</p>
+    <div class="lab-body" id="out-render">
+    {% if render_gap and render_gap.payload and render_gap.payload.results %}
+      {% for r in render_gap.payload.results[:1] %}
+      <p>Статус: <span class="badge {{ r.summary.status }}">{{ r.summary.status|ru_status }}</span>
+        · Разрывов: {{ r.summary.gap_count }}
+        {% if not r.playwright_available %} · <span class="warn">Playwright не установлен</span>{% endif %}
+      </p>
+      <ul>{% for g in r.gaps[:4] %}<li>{{ g.message }}</li>{% endfor %}</ul>
+      {% endfor %}
+    {% else %}<p class="muted">Не запускалось · pip install playwright</p>{% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const pageSelect = document.getElementById('page-select');
+  const status = document.getElementById('status');
+  const pi = () => pageSelect.value;
+
+  async function post(path) {
+    status.textContent = 'Выполняется ' + path + '…';
+    const r = await fetch(path + '?page_index=' + pi(), { method: 'POST' });
+    const data = await r.json();
+    if (data.error) status.textContent = 'Ошибка: ' + data.error;
+    else { status.textContent = 'Готово — перезагрузка…'; setTimeout(() => location.reload(), 800); }
+    return data;
+  }
+
+  document.querySelector('[data-action="bot-reality"]').onclick = () => post('/api/lab/bot-reality');
+  document.querySelector('[data-action="drift-baseline"]').onclick = () => post('/api/lab/drift/baseline');
+  document.querySelector('[data-action="drift-compare"]').onclick = () => post('/api/lab/drift/compare');
+  document.querySelector('[data-action="citations"]').onclick = () => post('/api/lab/citations');
+  document.querySelector('[data-action="geo"]').onclick = () => post('/api/lab/geo');
+  document.querySelector('[data-action="render-gap"]').onclick = () => post('/api/lab/render-gap');
+  document.getElementById('btn-all').onclick = async () => {
+    status.textContent = 'Запуск всех 5 фич (~1–3 мин)…';
+    const r = await fetch('/api/lab/run-all?page_index=' + pi(), { method: 'POST' });
+    const data = await r.json();
+    status.textContent = data.error ? ('Ошибка: ' + data.error) : 'Всё готово — перезагрузка…';
+    if (!data.error) setTimeout(() => location.reload(), 1000);
+  };
+</script>
+{% endblock %}

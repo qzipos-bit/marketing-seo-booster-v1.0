@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% set active = 'home' %}
+{% block title %}{{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = product_full %}
+{% set page_title = product_full %}
+{% set page_subtitle = product_tagline %}
+{% set page_actions %}
+  <div class="dashboard-actions">
+    <a href="/models" class="btn btn-link">Модели</a>
+    <a href="/checklist" class="btn btn-link">Чеклист 145</a>
+    <a href="/lab" class="btn btn-link">SEO Lab</a>
+    <a href="/exports" class="btn btn-link">Выгрузки</a>
+    <button class="btn primary" id="btn-all">Проверить всё</button>
+    <button class="btn" id="btn-models">Нейросети</button>
+    <button class="btn" id="btn-seo">SEO</button>
+    <button class="btn" id="btn-refresh">Обновить</button>
+  </div>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+{% if not has_api_key %}
+<div class="alert">
+  KIE_API_KEY не задан. Скопируй <code>.env.example</code> → <code>.env</code> и добавь ключ Kie.
+</div>
+{% endif %}
+
+<div class="dashboard-grid">
+  <div class="card">
+    <h3>Баланс Kie</h3>
+    <div class="value" id="kie-credit">—</div>
+    <div class="small muted">Последняя проверка моделей</div>
+  </div>
+  <div class="card">
+    <h3>Модели OK</h3>
+    <div class="value" id="models-ok">—</div>
+    <div class="small muted" id="models-total">из —</div>
+  </div>
+  <div class="card">
+    <h3>SEO-балл</h3>
+    <div class="value" id="seo-score">—</div>
+    <div class="score-bar"><span id="seo-bar" style="width:0%"></span></div>
+  </div>
+  <div class="card">
+    <h3>Автоскан</h3>
+    <div class="value" style="font-size:1.1rem">{{ scan_schedule }}</div>
+    <div class="small muted">Полный аудит · <a href="/history">история</a></div>
+  </div>
+  <div class="card">
+    <h3>Сканов в базе</h3>
+    <div class="value">{% if scan_stats %}{{ scan_stats.total_scans }}{% else %}0{% endif %}</div>
+    <div class="small muted"><a href="/history">История данных</a></div>
+  </div>
+</div>
+
+<div class="panels">
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Нейросети (Kie) — {{ models_list|length }} моделей</h2>
+      <a href="/models" class="btn btn-link small">Все модели →</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Модель</th>
+          <th>Семейство</th>
+          <th>Статус</th>
+          <th>мс</th>
+          <th>Ответ нейросети</th>
+        </tr>
+      </thead>
+      <tbody id="models-body">
+        {% if model_run and model_run.results %}
+          {% for r in model_run.results %}
+          <tr>
+            <td>{{ r.label }}<div class="small muted">{{ r.model_id }}</div></td>
+            <td class="small">{{ r.family or '—' }}</td>
+            <td><span class="badge {{ r.status }}">{{ r.status|ru_status }}</span></td>
+            <td>{{ r.latency_ms or '—' }}</td>
+            <td class="preview small">{% if r.response_full %}{{ r.response_full[:500] }}{% elif r.response_preview %}{{ r.response_preview }}{% elif r.error %}{{ r.error }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="5" class="muted">Запусти проверку моделей или открой <a href="/models">раздел моделей</a></td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+    <div class="history">
+      <table>
+        <thead><tr><th>Прогон</th><th>Время</th><th>OK</th><th>Ошибки</th></tr></thead>
+        <tbody>
+          {% for h in model_history %}
+          <tr>
+            <td>#{{ h.id }}</td>
+            <td class="small muted">{{ h.started_at[:19] }}</td>
+            <td>{{ h.summary.ok if h.summary else '—' }}</td>
+            <td>{{ h.summary.fail if h.summary else '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="muted">История пуста</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>SEO — {{ config.seo.site_name }}</h2>
+      {% if seo_run %}
+        <span class="badge {{ seo_run.status }}">{{ seo_run.status|ru_status }}</span>
+      {% else %}
+        <span class="badge neutral">нет данных</span>
+      {% endif %}
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Страница</th>
+          <th>Балл</th>
+          <th>HTTP</th>
+          <th>Проблемы</th>
+        </tr>
+      </thead>
+      <tbody id="seo-body">
+        {% if seo_run and seo_run.results %}
+          {% for r in seo_run.results %}
+          <tr>
+            <td>
+              <div>{{ r.label }}</div>
+              <div class="small muted">{{ r.url }}</div>
+            </td>
+            <td><span class="badge {{ r.status }}">{{ r.score }}</span></td>
+            <td>{{ r.http_status or '—' }}</td>
+            <td>
+              {% if r.issues %}
+                <ul class="issues small">
+                  {% for issue in r.issues[:4] %}<li>{{ issue }}</li>{% endfor %}
+                </ul>
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="4" class="muted">Запусти SEO-проверку (нужен запущенный сайт на localhost:3000)</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+    <div class="history">
+      <table>
+        <thead><tr><th>Прогон</th><th>Время</th><th>Ср. балл</th><th>Ошибки</th></tr></thead>
+        <tbody>
+          {% for h in seo_history %}
+          <tr>
+            <td>#{{ h.id }}</td>
+            <td class="small muted">{{ h.started_at[:19] }}</td>
+            <td>{{ h.summary.avg_score if h.summary else '—' }}</td>
+            <td>{{ h.summary.fail if h.summary else '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="muted">История пуста</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const toast = (msg) => {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 2500);
+  };
+
+  const setBusy = (busy) => {
+    document.querySelectorAll('button').forEach(b => b.disabled = busy);
+  };
+
+  const dashApiHeaders = () => {
+    const h = {};
+    {% if monitor_api_token %}
+    h['Authorization'] = 'Bearer {{ monitor_api_token }}';
+    {% endif %}
+    return h;
+  };
+
+  const call = async (url) => {
+    setBusy(true);
+    toast('Проверка…');
+    try {
+      const res = await fetch(url, { method: 'POST', headers: dashApiHeaders() });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || d.error || ('HTTP ' + res.status));
+      }
+      await res.json();
+      location.reload();
+    } catch (e) {
+      toast('Ошибка: ' + e.message);
+      setBusy(false);
+    }
+  };
+
+  document.getElementById('btn-all').onclick = () => call('/api/check/all?skip_ai_review=true');
+  document.getElementById('btn-models').onclick = () => call('/api/check/models');
+  document.getElementById('btn-seo').onclick = () => call('/api/check/seo?skip_ai_review=true');
+  document.getElementById('btn-refresh').onclick = () => location.reload();
+
+  {% if model_run and model_run.summary %}
+  document.getElementById('models-ok').textContent = {{ model_run.summary.ok }};
+  document.getElementById('models-total').textContent = 'из {{ model_run.summary.total }}';
+  {% if model_run.summary.credit is not none %}
+  document.getElementById('kie-credit').textContent = {{ model_run.summary.credit }};
+  {% endif %}
+  {% endif %}
+  {% if seo_run and seo_run.summary %}
+  document.getElementById('seo-score').textContent = {{ seo_run.summary.avg_score }};
+  document.getElementById('seo-bar').style.width = '{{ seo_run.summary.avg_score }}%';
+  {% endif %}
+</script>
+{% endblock %}

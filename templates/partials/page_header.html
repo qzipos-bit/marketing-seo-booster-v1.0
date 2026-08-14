@@ -1,0 +1,16 @@
+<header class="msb-page-header">
+  <div class="msb-page-header__text">
+    {% if breadcrumb %}
+    <div class="msb-breadcrumb">{{ breadcrumb }}</div>
+    {% endif %}
+    <h1 class="msb-page-title">{{ page_title }}</h1>
+    {% if page_subtitle %}
+    <p class="msb-page-subtitle">{{ page_subtitle }}</p>
+    {% endif %}
+  </div>
+  {% if page_actions %}
+  <div class="msb-page-header__actions">
+    {{ page_actions }}
+  </div>
+  {% endif %}
+</header>

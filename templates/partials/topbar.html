@@ -1,0 +1,107 @@
+<header class="ah-topbar">
+  <a href="/" class="ah-logo" title="Marketing SEO Booster">
+    <img src="/static/seo-logo.png" alt="" class="ah-logo-img" width="36" height="36" />
+    <span class="ah-logo-text">
+      <span class="ah-logo-brand">SEO Booster</span>
+      <span class="ah-logo-ver">v{{ product_version }}</span>
+    </span>
+  </a>
+
+  <nav class="ah-nav" aria-label="Главное меню">
+    <a href="/" class="ah-nav-link {% if active == 'home' %}is-active{% endif %}">Обзор</a>
+    <a href="/command" class="ah-nav-link {% if active == 'command' %}is-active{% endif %}">Command</a>
+
+    <div class="ah-nav-dd {% if active in ['eeat','ymyl','checklist','pro','lab'] %}is-active-group{% endif %}">
+      <button type="button" class="ah-nav-dd-btn" aria-haspopup="true">Аудит</button>
+      <div class="ah-nav-dd-menu">
+        <a href="/eeat" {% if active == 'eeat' %}class="is-active"{% endif %}>E-E-A-T</a>
+        <a href="/ymyl" {% if active == 'ymyl' %}class="is-active"{% endif %}>YMYL</a>
+        <a href="/checklist" {% if active == 'checklist' %}class="is-active"{% endif %}>Чеклист 145</a>
+        <a href="/pro" {% if active == 'pro' %}class="is-active"{% endif %}>Pro-аудит</a>
+        <a href="/lab" {% if active == 'lab' %}class="is-active"{% endif %}>SEO Lab</a>
+      </div>
+    </div>
+
+    <div class="ah-nav-dd {% if active in ['ahrefs','leaks','competitors','models','eeat-library','ymyl-library'] %}is-active-group{% endif %}">
+      <button type="button" class="ah-nav-dd-btn" aria-haspopup="true">Intel</button>
+      <div class="ah-nav-dd-menu">
+        <a href="/ahrefs" {% if active == 'ahrefs' %}class="is-active"{% endif %}>Ahrefs</a>
+        <a href="/eeat-library" {% if active == 'eeat-library' %}class="is-active"{% endif %}>E-E-A-T Library</a>
+        <a href="/ymyl-library" {% if active == 'ymyl-library' %}class="is-active"{% endif %}>YMYL Library</a>
+        <a href="/leaks" {% if active == 'leaks' %}class="is-active"{% endif %}>Google Leaks</a>
+        <a href="/competitors" {% if active == 'competitors' %}class="is-active"{% endif %}>Конкуренты</a>
+        <a href="/models" {% if active == 'models' %}class="is-active"{% endif %}>AI-модели</a>
+      </div>
+    </div>
+
+    <a href="/history" class="ah-nav-link {% if active == 'history' %}is-active{% endif %}">История</a>
+    <a href="/exports" class="ah-nav-link {% if active == 'exports' %}is-active{% endif %}">Выгрузки</a>
+  </nav>
+
+  <div class="ah-actions">
+    <button type="button" class="ah-action ah-action--primary" id="btn-scan-now" onclick="runScanNow()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      Скан
+    </button>
+    <div class="ah-nav-dd ah-nav-dd--right" id="export-dd">
+      <button type="button" class="ah-action ah-action--ghost" onclick="document.getElementById('export-dd').classList.toggle('open')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Экспорт
+      </button>
+      <div class="ah-nav-dd-menu">
+        <a href="/api/export/scan-history.csv">История сканов</a>
+        <a href="/api/export/checklist.csv">Чеклист</a>
+        <a href="/api/export/ahrefs-design.md">Ahrefs бриф</a>
+        <a href="/api/export/competitors-changes.csv">Конкуренты</a>
+        <a href="/api/export/snapshot.json">Snapshot JSON</a>
+        <a href="/exports" class="ah-menu-footer">Все выгрузки →</a>
+      </div>
+    </div>
+  </div>
+</header>
+<script>
+  document.addEventListener('click', e => {
+    document.querySelectorAll('.ah-nav-dd.open').forEach(dd => {
+      if (!dd.contains(e.target)) dd.classList.remove('open');
+    });
+  });
+  document.querySelectorAll('.ah-nav-dd-btn, .ah-action--ghost').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const dd = btn.closest('.ah-nav-dd');
+      if (!dd) return;
+      e.stopPropagation();
+      const wasOpen = dd.classList.contains('open');
+      document.querySelectorAll('.ah-nav-dd.open').forEach(d => d.classList.remove('open'));
+      if (!wasOpen) dd.classList.add('open');
+    });
+  });
+  function apiHeaders() {
+    const h = {};
+    {% if monitor_api_token %}
+    h['Authorization'] = 'Bearer {{ monitor_api_token }}';
+    {% endif %}
+    return h;
+  }
+  async function runScanNow() {
+    const btn = document.getElementById('btn-scan-now');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="ah-spin"></span> Скан…';
+    try {
+      const r = await fetch('/api/scan/run', { method: 'POST', headers: apiHeaders() });
+      const d = await r.json();
+      if (!r.ok) {
+        alert(d.detail || d.error || 'Ошибка ' + r.status);
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Скан';
+        return;
+      }
+      if (d.errors && d.errors.length) alert('Скан завершён с предупреждениями');
+      location.reload();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Скан';
+    }
+  }
+</script>

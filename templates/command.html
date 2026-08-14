@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% set active = 'command' %}
+{% block title %}Command Center — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = product_full ~ ' / Command' %}
+{% set page_title = 'SEO Command Center — ' ~ site_name ~ ((' (' ~ domain ~ ')') if domain else '') %}
+{% set page_subtitle %}
+  Обновлено {{ cmd.generated_at[:19] }} UTC · автоскан {{ scan_schedule }}
+  {% if alerts_status.telegram %} · Telegram ✓{% endif %}
+  {% if alerts_status.webhook %} · Webhook ✓{% endif %}
+{% endset %}
+{% set h = cmd.health %}
+{% set page_actions %}
+  <span class="health-pill health-{{ h.status }}">{{ h.label }}</span>
+  <button class="btn primary" onclick="runScanNow()">▶ Скан</button>
+  <button class="btn" onclick="testAlert()">Тест алерта</button>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="cmd-grid">
+  <div class="cmd-kpi">
+    <div class="val">{% if cmd.kpis.checklist_score is not none %}{{ cmd.kpis.checklist_score|round(1) }}%{% else %}—{% endif %}</div>
+    <div class="lbl">Checklist score</div>
+    {% if cmd.kpis.checklist_delta is not none %}
+    <div class="delta {% if cmd.kpis.checklist_delta >= 0 %}delta-up{% else %}delta-down{% endif %}">
+      {% if cmd.kpis.checklist_delta >= 0 %}+{% endif %}{{ cmd.kpis.checklist_delta }}% vs прошлый
+    </div>
+    {% endif %}
+  </div>
+  <div class="cmd-kpi">
+    <div class="val">{{ cmd.kpis.checklist_grade or '—' }}</div>
+    <div class="lbl">Grade</div>
+  </div>
+  <div class="cmd-kpi">
+    <div class="val">{% if cmd.kpis.geo_avg_score is not none %}{{ cmd.kpis.geo_avg_score|round(0) }}{% else %}—{% endif %}</div>
+    <div class="lbl">GEO score</div>
+  </div>
+  <div class="cmd-kpi">
+    <div class="val">{% if cmd.kpis.ai_citations is not none %}{{ cmd.kpis.ai_citations }}{% else %}—{% endif %}</div>
+    <div class="lbl">AI citations</div>
+  </div>
+</div>
+
+<div class="cmd-grid cmd-grid--5">
+  <div class="cmd-kpi">
+    <div class="val stat-val--sm">{{ cmd.kpis.pass or 0 }}</div>
+    <div class="lbl">Pass</div>
+  </div>
+  <div class="cmd-kpi">
+    <div class="val stat-val--sm stat-val--warn">{{ cmd.kpis.warn or 0 }}</div>
+    <div class="lbl">Warn</div>
+  </div>
+  <div class="cmd-kpi">
+    <div class="val stat-val--sm stat-val--fail">{{ cmd.kpis.fail or 0 }}</div>
+    <div class="lbl">Fail</div>
+  </div>
+  <div class="cmd-kpi">
+    <div class="val stat-val--sm">{% if cmd.kpis.bot_mismatch %}{{ cmd.kpis.bot_mismatch }}{% else %}0{% endif %}</div>
+    <div class="lbl">Bot mismatch</div>
+  </div>
+  <div class="cmd-kpi">
+    <div class="val stat-val--sm">{% if cmd.last_scan.id %}#{{ cmd.last_scan.id }}{% else %}—{% endif %}</div>
+    <div class="lbl">Последний скан</div>
+  </div>
+</div>
+
+{% if cmd.signals %}
+<div class="panel panel--spaced">
+  <h3>⚠ Сигналы</h3>
+  {% for s in cmd.signals %}
+  <div class="signal signal-{{ s.severity }}">
+    <strong>{{ s.title }}</strong> — {{ s.detail }}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="cmd-two">
+  <div class="panel">
+    <h3>📋 P0 / P1 — сделать сегодня ({{ cmd.action_counts.p0 }} P0 · {{ cmd.action_counts.p1 }} P1)</h3>
+    {% if cmd.today_actions %}
+      {% for a in cmd.today_actions %}
+      <div class="action-item">
+        <span class="prio prio-{{ a.priority }}">{{ a.priority }}</span>
+        <strong>{{ a.title }}</strong>
+        {% if a.evidence %}<div class="action-evidence">{{ a.evidence[:120] }}{% if a.evidence|length > 120 %}…{% endif %}</div>{% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">Нет данных — запустите полный скан или Pro-аудит</p>
+    {% endif %}
+    <p class="panel-links"><a href="/pro">Pro roadmap →</a> · <a href="/checklist">Чеклист →</a></p>
+  </div>
+
+  <div class="panel">
+    <h3>📈 Тренд (14 сканов)</h3>
+    {% if cmd.trends %}
+    <div class="trend-mini">
+      {% for t in cmd.trends %}
+      {% set h = ((t.checklist_score or 0) * 0.45) %}
+      <div class="bar" style="height:{{ h if h > 3 else 3 }}px" title="{{ t.checklist_score }}%"></div>
+      {% endfor %}
+    </div>
+    <p class="msb-page-meta">
+      Последний: {% if cmd.last_scan.finished_at %}{{ cmd.last_scan.finished_at[:16] }}{% else %}—{% endif %}
+      · {{ cmd.last_scan.trigger or '—' }}
+    </p>
+    {% else %}
+      <p class="muted">Недостаточно сканов для тренда</p>
+    {% endif %}
+
+    <h3 class="h3--spaced">🔔 Алерты</h3>
+    {% if alerts %}
+      {% for a in alerts[:8] %}
+      <div class="alert-row">
+        <span class="alert-ch">{% if a.delivered_telegram %}TG{% endif %}{% if a.delivered_webhook %} WH{% endif %}</span>
+        {{ a.created_at[:16] }} — <strong>{{ a.title }}</strong>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted small">Алерты появятся после скана. Настройте TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID в .env</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel">
+  <h3>🔗 Страницы и пары (Tier-1 в приоритете)</h3>
+  <table class="pairs-table">
+    <thead>
+      <tr>
+        <th>Страница</th>
+        <th>Tier</th>
+        <th>Checklist</th>
+        <th>SEO</th>
+        <th>GEO</th>
+        <th>Issues</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in cmd.pairs %}
+      <tr>
+        <td>
+          <a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.label }}</a>
+          {% if p.keyword %}<div class="small muted">{{ p.keyword }}</div>{% endif %}
+        </td>
+        <td>{% if p.tier != '—' %}<span class="tier">{{ p.tier }}</span>{% else %}—{% endif %}</td>
+        <td class="st-{{ p.status }}">
+          {% if p.checklist_score is not none %}{{ p.checklist_score|round(0) }}% {{ p.checklist_grade or '' }}{% else %}—{% endif %}
+        </td>
+        <td>{% if p.seo_score is not none %}{{ p.seo_score }}{% else %}—{% endif %}</td>
+        <td>{% if p.geo_score is not none %}{{ p.geo_score }}{% else %}—{% endif %}</td>
+        <td class="{% if p.fail_count %}st-bad{% elif p.warn_count %}st-warn{% else %}st-ok{% endif %}">
+          {% if p.fail_count %}{{ p.fail_count }} fail{% endif %}
+          {% if p.warn_count %}{% if p.fail_count %}, {% endif %}{{ p.warn_count }} warn{% endif %}
+          {% if not p.fail_count and not p.warn_count %}ok{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function testAlert() {
+    try {
+      const r = await fetch('/api/alerts/test', { method: 'POST', headers: apiHeaders() });
+      const d = await r.json();
+      if (!r.ok) { alert(d.detail || d.error || 'Ошибка'); return; }
+      const ch = [];
+      if (d.delivered?.telegram) ch.push('Telegram');
+      if (d.delivered?.webhook) ch.push('Webhook');
+      if (!ch.length) {
+        alert('Алерт записан в лог, но каналы не настроены. Добавьте TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в .env');
+      } else {
+        alert('Тест отправлен: ' + ch.join(', '));
+      }
+      location.reload();
+    } catch (e) { alert(e.message); }
+  }
+</script>
+{% endblock %}

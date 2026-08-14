@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% set active = checklist_type %}
+{% block title %}{{ page_title }} — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = 'Аудит / ' ~ checklist_type|upper %}
+{% set _subtitle_base = page_subtitle %}
+{% set page_subtitle %}
+  {{ item_count }} критериев · {{ _subtitle_base }} ·
+  {% if run %}{{ run.label }}{% else %}Запусти проверку{% endif %}
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="stats">
+    {% if run and run.summary %}
+    <div class="grade {{ run.summary.grade }}">{{ run.summary.grade }}</div>
+    <div class="stat"><div class="val">{{ run.summary.score }}%</div><div class="lbl">Балл</div></div>
+    <div class="stat"><div class="val stat-val--pass">{{ run.summary.counts.pass }}</div><div class="lbl">OK</div></div>
+    <div class="stat"><div class="val stat-val--fail">{{ run.summary.counts.fail }}</div><div class="lbl">Fail</div></div>
+    {% else %}
+    <div class="grade F">—</div>
+    {% endif %}
+  </div>
+</section>
+
+<div class="tabs-sub">
+  <a href="/eeat" {% if checklist_type == 'eeat' %}class="active"{% endif %}>E-E-A-T</a>
+  <a href="/ymyl" {% if checklist_type == 'ymyl' %}class="active"{% endif %}>YMYL</a>
+  <a href="/library">📚 Библиотека источников</a>
+  {% if checklist_type == 'eeat' %}
+  <a href="/eeat-library">📖 E-E-A-T Library</a>
+  {% endif %}
+  {% if checklist_type == 'ymyl' %}
+  <a href="/ymyl-library">⚠️ YMYL Library</a>
+  {% endif %}
+</div>
+
+<div class="lib-banner">
+  {% if checklist_type == 'eeat' %}
+  Основано на <strong>Google QRG (Sep 2025)</strong>, Search Central и регуляторике (SEC, FATF, FinCEN).
+  <a href="/library">Полная библиотека →</a>
+  · <a href="/eeat-library">Собранные документы и insights →</a>
+  · Промпт AI Research: <code>prompts/eeat-research-prompt.md</code>
+  {% elif checklist_type == 'ymyl' %}
+  Основано на <strong>Google QRG §2.3 YMYL</strong>, SEC/FTC investor alerts, FATF, ESMA, FinCEN.
+  <a href="/library">Библиотека источников →</a>
+  · <a href="/ymyl-library">Собранные harm-документы →</a>
+  · Harm prevention: YY05–YY11, regulatory: YY17–YY18
+  {% else %}
+  Основано на <strong>Google QRG (Sep 2025)</strong> и регуляторике.
+  <a href="/library">Полная библиотека →</a>
+  {% endif %}
+</div>
+
+<div class="toolbar">
+  <select class="btn" id="page-select">
+    {% for p in pages %}
+    <option value="{{ loop.index0 }}">{{ p.label }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn primary" id="btn-run">Запустить {{ checklist_type|upper }} аудит</button>
+  {% if checklist_type == 'eeat' %}
+  <button class="btn" id="btn-ai-research" title="Perplexity sonar-pro: сбор документов + глубокий E-E-A-T">🔍 AI Research</button>
+  {% endif %}
+  {% if checklist_type == 'ymyl' %}
+  <button class="btn" id="btn-ai-research" title="Perplexity sonar-pro: harm prevention + YMYL audit">🔍 AI Research</button>
+  {% endif %}
+  <input class="search" id="search" placeholder="Поиск критерия…" />
+</div>
+
+<div class="filters" id="block-filters">
+  <span class="chip active" data-block="all">Все блоки</span>
+  {% for bid, name in blocks.items() %}
+  <span class="chip" data-block="{{ bid }}">{{ bid }} · {{ name }}</span>
+  {% endfor %}
+</div>
+
+<div class="filters" id="status-filters">
+  <span class="chip active" data-status="all">Все</span>
+  <span class="chip" data-status="pass">✅</span>
+  <span class="chip" data-status="warn">⚠️</span>
+  <span class="chip" data-status="fail">❌</span>
+  <span class="chip" data-status="pending">⏳</span>
+</div>
+
+<div class="grid" id="cards">
+  {% for item in display_items %}
+  <article class="card" data-block="{{ item.block }}" data-status="{{ item.status }}"
+           data-title="{{ item.title|lower }} {{ item.id|lower }}">
+    <span class="badge {{ item.status }}">{{ item.status|ru_status }}</span>
+    <div class="card-id">#{{ item.id }} · {{ item.scope }}</div>
+    <div class="card-block">{{ item.block }} · {{ item.block_name }}</div>
+    <div class="card-title"><span class="sev {{ item.severity }}"></span>{{ item.title }}</div>
+    {% if item.source %}<div class="source-link">📎 {{ item.source }}</div>{% endif %}
+    <script type="application/json" class="card-data">{{ item|tojson }}</script>
+  </article>
+  {% endfor %}
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h2 id="m-title"></h2>
+    <div class="meta" id="m-meta"></div>
+    <p id="m-source" class="modal-source"></p>
+    <p id="m-how" class="modal-how"></p>
+    <div class="evidence" id="m-evidence"></div>
+    <button class="btn modal-close" onclick="closeModal()">Закрыть</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const API_PATH = '{{ api_path }}';
+  let activeBlock = 'all', activeStatus = 'all';
+  document.querySelectorAll('#block-filters .chip').forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll('#block-filters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      activeBlock = el.dataset.block;
+      filterCards();
+    };
+  });
+  document.querySelectorAll('#status-filters .chip').forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll('#status-filters .chip').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+      activeStatus = el.dataset.status;
+      filterCards();
+    };
+  });
+  document.getElementById('search').oninput = filterCards;
+  function filterCards() {
+    const q = document.getElementById('search').value.toLowerCase();
+    document.querySelectorAll('#cards .card').forEach(card => {
+      const ok = (activeBlock === 'all' || card.dataset.block === activeBlock)
+        && (activeStatus === 'all' || card.dataset.status === activeStatus)
+        && (!q || card.dataset.title.includes(q));
+      card.classList.toggle('hidden', !ok);
+    });
+  }
+  document.querySelectorAll('#cards .card').forEach(card => {
+    card.onclick = () => {
+      const d = JSON.parse(card.querySelector('.card-data').textContent);
+      document.getElementById('m-title').textContent = `#${d.id} — ${d.title}`;
+      document.getElementById('m-meta').textContent = `${d.block_name} · ${d.severity} · ${d.status}`;
+      document.getElementById('m-source').textContent = d.source ? 'Источник: ' + d.source : '';
+      document.getElementById('m-how').textContent = 'Как проверять: ' + d.how;
+      document.getElementById('m-evidence').textContent = d.evidence || '—';
+      document.getElementById('modal').classList.add('open');
+    };
+  });
+  function closeModal() { document.getElementById('modal').classList.remove('open'); }
+  document.getElementById('modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+  document.getElementById('btn-run').onclick = async () => {
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    btn.textContent = 'Аудит…';
+    try {
+      const headers = typeof apiHeaders === 'function' ? apiHeaders() : {};
+      const r = await fetch(API_PATH + '?page_index=' + document.getElementById('page-select').value, {
+        method: 'POST',
+        headers,
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || d.error || 'HTTP ' + r.status);
+      if (d.error && !d.results) throw new Error(d.error);
+      location.reload();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Запустить {{ checklist_type|upper }} аудит';
+    }
+  };
+  const btnAi = document.getElementById('btn-ai-research');
+  if (btnAi) {
+    const aiPath = '{{ checklist_type }}' === 'ymyl'
+      ? '/api/check/ymyl/ai-research'
+      : '/api/check/eeat/ai-research';
+    const aiTitle = '{{ checklist_type }}' === 'ymyl' ? 'AI YMYL Research' : 'AI E-E-A-T Research';
+    btnAi.onclick = async () => {
+      btnAi.disabled = true;
+      btnAi.textContent = 'AI Research… (1–3 мин)';
+      try {
+        const headers = typeof apiHeaders === 'function' ? apiHeaders() : {};
+        const r = await fetch(aiPath + '?page_index=' + document.getElementById('page-select').value, {
+          method: 'POST',
+          headers,
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.detail || d.error || 'HTTP ' + r.status);
+        const ai = d.ai_research || {};
+        if (ai.status !== 'ok') throw new Error(ai.error || 'AI research failed');
+        const ing = ai.ingest || {};
+        const docStats = ing.documents || {};
+        const meta = [
+          ai.model || '',
+          (ai.latency_ms || '') + ' ms',
+          docStats.added ? '+' + docStats.added + ' docs' : '',
+          ing.insights_added ? '+' + ing.insights_added + ' insights' : '',
+        ].filter(Boolean).join(' · ');
+        document.getElementById('m-title').textContent = aiTitle;
+        document.getElementById('m-meta').textContent = meta;
+        document.getElementById('m-source').textContent = 'Промпт: prompts/{{ checklist_type }}-research-prompt.md · ingest → /eeat-library';
+        document.getElementById('m-how').textContent = '{{ checklist_type|upper }} audit + harm scenarios + document registry';
+        let body = ai.executive_summary || '';
+        if (body && ai.review) body += '\n\n---\n\n';
+        body += ai.review || '—';
+        document.getElementById('m-evidence').textContent = body;
+        document.getElementById('modal').classList.add('open');
+      } catch (e) {
+        alert('Ошибка AI Research: ' + e.message);
+      } finally {
+        btnAi.disabled = false;
+        btnAi.textContent = '🔍 AI Research';
+      }
+    };
+  }
+</script>
+{% endblock %}

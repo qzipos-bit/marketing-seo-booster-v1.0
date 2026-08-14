@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% set active = 'ymyl-library' %}
+{% block title %}YMYL Library — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = product_full ~ ' / YMYL Library' %}
+{% set page_title = 'Библиотека YMYL — ' ~ site_name %}
+{% set page_subtitle = 'Harm prevention: SEC, CFTC, ESMA, AML freeze, scam signals — YY01–YY28' %}
+{% set page_actions %}
+  <a class="btn" href="/ymyl">↩ YMYL аудит</a>
+  <a class="btn" href="/api/export/ymyl-library.md">📄 Экспорт MD</a>
+  <a class="btn" href="/api/ymyl-library/documents">API JSON</a>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="leak-stats">
+  <div class="leak-stat leak-stat--accent"><div class="val">{{ stats.documents }}</div><div class="lbl">Документов</div></div>
+  <div class="leak-stat"><div class="val">{{ stats.insights }}</div><div class="lbl">Harm insights</div></div>
+  {% for harm, count in stats.by_harm.items() %}
+  {% if count > 0 %}
+  <div class="leak-stat"><div class="val">{{ count }}</div><div class="lbl">{{ harm_labels.get(harm, harm) }}</div></div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<div class="tabs-sub leak-tabs">
+  <a href="/ymyl-library?tab=overview" class="{% if tab == 'overview' %}active{% endif %}">📊 Overview</a>
+  <a href="/ymyl-library?tab=insights" class="{% if tab == 'insights' %}active{% endif %}">💡 Harm Insights</a>
+  <a href="/ymyl-library?tab=criteria" class="{% if tab == 'criteria' %}active{% endif %}">🔗 YY → Docs</a>
+  <a href="/ymyl-library?tab=library" class="{% if tab == 'library' %}active{% endif %}">📚 Документы</a>
+  <a href="/ymyl">⚡ Аудит</a>
+</div>
+
+{% if tab == 'overview' %}
+<section>
+  <p class="msb-page-meta">
+    Матрица финансового вреда для crypto exchange (QRG §2.3). Каждый сценарий привязан к критериям YY и документам библиотеки.
+  </p>
+  <table class="ymyl-scenario-table">
+    <thead>
+      <tr><th>Сценарий</th><th>Likelihood</th><th>Severity</th><th>Mitigation</th><th>Criteria</th><th>Документ</th></tr>
+    </thead>
+    <tbody>
+      {% for sc in harm_scenarios %}
+      <tr>
+        <td><strong>{{ sc.title }}</strong></td>
+        <td><span class="ymyl-likelihood lik-{{ sc.likelihood }}">{{ sc.likelihood }}</span></td>
+        <td><span class="prio prio-{{ sc.severity }}">{{ sc.severity }}</span></td>
+        <td>{{ sc.mitigation }}</td>
+        <td>{% for c in sc.criteria_ids %}<a href="/ymyl#card-{{ c }}" class="ymyl-crit-tag">{{ c }}</a>{% endfor %}</td>
+        <td><a href="/ymyl-library?tab=library&doc={{ sc.library_doc_id }}">{{ sc.library_doc_id }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3 class="ymyl-section-title" style="margin-top:2rem">Блоки YMYL (YY01–YY28)</h3>
+  <div class="ymyl-block-overview">
+    {% for bid, name in block_labels.items() %}
+    <div class="ymyl-block-card">
+      <span class="ymyl-block-id">{{ bid }}</span>
+      <strong>{{ name }}</strong>
+      <p class="small muted">
+        {% if bid == 'Y1' %}YY01–YY04{% elif bid == 'Y2' %}YY05–YY11{% elif bid == 'Y3' %}YY12–YY16{% elif bid == 'Y4' %}YY17–YY21{% else %}YY22–YY28{% endif %}
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% elif tab == 'insights' %}
+<section>
+  <p class="msb-page-meta">
+    Выводы по финансовому вреду из {{ stats.documents }} документов — SEC, CFTC, ESMA, AML freeze, BestChange, Trustpilot.
+  </p>
+  {% for ins in insights %}
+  <article class="rec-card pri-{{ ins.severity }}">
+    <div class="rec-top">
+      <span class="prio prio-{{ ins.severity }}">{{ ins.severity }}</span>
+      <span class="src-tag">{{ ins.ymyl_block }} · {{ harm_labels.get(ins.harm_category, ins.harm_category) }}</span>
+      <span class="src-tag">{{ ins.criteria_ids|join(', ') }}</span>
+      <code class="leak-tag">{{ ins.id }}</code>
+    </div>
+    <h3 class="rec-title">{{ ins.title }}</h3>
+    <div class="rec-action"><strong>Рекомендация:</strong> {{ ins.recommendation }}</div>
+    <div class="rec-meta">
+      {% if ins.document_title %}
+      <strong>Источник:</strong>
+      <a href="{{ ins.document_url }}" target="_blank" rel="noopener">{{ ins.document_title }}</a>
+      ·
+      {% endif %}
+      <a href="/ymyl#card-{{ ins.criteria_ids[0] }}">Перейти к аудиту →</a>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+
+{% elif tab == 'criteria' %}
+<section>
+  <p class="msb-page-meta">Привязка критериев YY01–YY28 к документам библиотеки (по criteria_ids).</p>
+  <table class="rules-table ymyl-criteria-table">
+    <thead>
+      <tr><th>Критерий</th><th>Документы</th><th>Insights</th></tr>
+    </thead>
+    <tbody>
+      {% for cid, docs in criteria_map.items()|sort %}
+      <tr>
+        <td><a href="/ymyl#card-{{ cid }}"><code>{{ cid }}</code></a></td>
+        <td class="small">
+          {% for doc in docs %}
+          <a class="ymyl-doc-pill" href="/ymyl-library?tab=library&doc={{ doc.id }}">{{ doc.id.replace('YMYL-', '') }}</a>
+          {% endfor %}
+        </td>
+        <td class="small">
+          {% for ins in insights if cid in ins.criteria_ids %}
+          <span class="prio prio-{{ ins.severity }}" title="{{ ins.title }}">{{ ins.id }}</span>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% elif tab == 'library' %}
+<section>
+  <div class="toolbar" style="margin-bottom:1rem">
+    <select class="btn" onchange="location.href='/ymyl-library?tab=library&harm='+this.value">
+      <option value="">Все harm types</option>
+      {% for key, label in harm_labels.items() %}
+      <option value="{{ key }}" {% if filter_harm == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select class="btn" onchange="location.href='/ymyl-library?tab=library&category='+this.value">
+      <option value="">Все категории</option>
+      {% for key, label in category_labels.items() %}
+      <option value="{{ key }}" {% if filter_category == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% if selected_doc %}
+  <p><a href="/ymyl-library?tab=library">← Все документы</a></p>
+  <div class="rec-meta" style="margin-bottom:1rem">
+    <span class="src-tag">{{ tier_labels.get(selected_doc.tier, selected_doc.tier) }}</span>
+    <span class="src-tag">{{ harm_labels.get(selected_doc.harm_category, selected_doc.harm_category) }}</span>
+    <span class="src-tag">{{ supports_labels.get(selected_doc.supports_brand, selected_doc.supports_brand) }}</span>
+    <span class="src-tag">{{ block_labels.get(selected_doc.ymyl_block, selected_doc.ymyl_block) }}</span>
+    <a href="{{ selected_doc.source_url }}" target="_blank" rel="noopener">Оригинал ↗</a>
+  </div>
+  <div class="ymyl-doc-criteria">
+    {% for cid in selected_doc.criteria_ids %}
+    <a class="ymyl-crit-tag" href="/ymyl#card-{{ cid }}">{{ cid }}</a>
+    {% endfor %}
+  </div>
+  <div class="lib-content">{{ doc_html|safe }}</div>
+  {% else %}
+  <div class="doc-grid">
+    {% for doc in documents %}
+    <a class="doc-card" href="/ymyl-library?tab=library&doc={{ doc.id }}">
+      <span class="cred">{{ harm_labels.get(doc.harm_category, doc.harm_category) }}</span>
+      <h4>{{ doc.title }}</h4>
+      <p>{{ doc.summary }}</p>
+      <p class="doc-card-meta">
+        {{ supports_labels.get(doc.supports_brand, doc.supports_brand) }} ·
+        {{ block_labels.get(doc.ymyl_block, doc.ymyl_block) }} ·
+        {{ doc.criteria_ids|join(', ') }}
+      </p>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

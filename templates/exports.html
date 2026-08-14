@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% set active = 'exports' %}
+{% block title %}Выгрузки данных — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = product_name ~ ' / Выгрузки' %}
+{% set page_title = 'Экспорт данных — ' ~ site_name ~ ((' (' ~ domain ~ ')') if domain else '') %}
+{% set page_subtitle = 'Как в Ahrefs: выгружай текущий прогон в CSV/JSON для Excel, Looker Studio или своего пайплайна. Имена файлов: ' ~ (site_name|lower) ~ '_модуль_дата.csv' %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="export-grid">
+  <div class="export-card">
+    <h3>📋 Чеклист 145</h3>
+    <p>Все критерии: id, блок, severity, status, evidence</p>
+    <div class="links">
+      <a href="/api/export/checklist.csv">CSV</a>
+      <a href="/api/export/checklist.json">JSON</a>
+    </div>
+  </div>
+
+  <div class="export-card">
+    <h3>🎯 Pro-аудит</h3>
+    <p>Bot matrix, security headers, roadmap</p>
+    <div class="links">
+      <a href="/api/export/pro.csv">CSV</a>
+      <a href="/api/export/pro.json">JSON</a>
+      <a href="/api/pro/export.md">Markdown</a>
+    </div>
+  </div>
+
+  <div class="export-card">
+    <h3>🛡️ Bot Reality</h3>
+    <p>robots vs HTTP по каждому AI-боту</p>
+    <div class="links"><a href="/api/export/lab/bot_reality.csv">CSV</a></div>
+  </div>
+
+  <div class="export-card">
+    <h3>📉 Drift Guard</h3>
+    <p>Изменения после деплоя</p>
+    <div class="links"><a href="/api/export/lab/drift.csv">CSV</a></div>
+  </div>
+
+  <div class="export-card">
+    <h3>🤖 Citation Radar</h3>
+    <p>Запросы × модели × cite rate</p>
+    <div class="links"><a href="/api/export/lab/citations.csv">CSV</a></div>
+  </div>
+
+  <div class="export-card">
+    <h3>📊 GEO Score</h3>
+    <p>Citability 0–100 по страницам</p>
+    <div class="links"><a href="/api/export/lab/geo.csv">CSV</a></div>
+  </div>
+
+  <div class="export-card">
+    <h3>🔬 Render Gap</h3>
+    <p>Raw HTML vs Playwright</p>
+    <div class="links"><a href="/api/export/lab/render_gap.csv">CSV</a></div>
+  </div>
+
+  <div class="export-card">
+    <h3>🧠 Модели Kie</h3>
+    <p>Latency, status, ответы</p>
+    <div class="links"><a href="/api/export/models.csv">CSV</a></div>
+  </div>
+
+  <div class="export-card">
+    <h3>🔍 SEO-страницы</h3>
+    <p>Score, issues по URL</p>
+    <div class="links"><a href="/api/export/seo.csv">CSV</a></div>
+  </div>
+
+  <div class="export-card export-card--green">
+    <h3>📈 История сканов</h3>
+    <p>Полный аудит-цикл: чеклист, SEO, GEO, модели, pro</p>
+    <div class="links">
+      <a href="/api/export/scan-history.csv">CSV</a>
+      <a href="/history">Дашборд →</a>
+    </div>
+  </div>
+
+  <div class="export-card export-card--blue">
+    <h3>📦 Полный snapshot</h3>
+    <p>Все latest runs одним JSON — для бэкапа и анализа</p>
+    <div class="links">
+      <a href="/api/export/snapshot.json">snapshot.json</a>
+    </div>
+  </div>
+</div>
+
+{% if history %}
+<h3 class="exports-history-title">История выгрузок</h3>
+<table class="matrix">
+  <tr><th>Время</th><th>Модуль</th><th>Формат</th><th>Строк</th><th>Сайт</th></tr>
+  {% for h in history %}
+  <tr>
+    <td>{{ h.created_at[:19] }}</td>
+    <td>{{ h.module }}</td>
+    <td>{{ h.format }}</td>
+    <td>{{ h.row_count }}</td>
+    <td>{{ h.site }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}

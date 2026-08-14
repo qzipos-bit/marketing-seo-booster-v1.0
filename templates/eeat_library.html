@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% set active = 'eeat-library' %}
+{% block title %}E-E-A-T Library — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = product_full ~ ' / E-E-A-T Library' %}
+{% set page_title = 'Библиотека E-E-A-T — ' ~ site_name %}
+{% set page_subtitle = 'Официальные документы, Quickex legal, форумы и репутация' %}
+{% set page_actions %}
+  <a class="btn" href="/api/export/eeat-library.md">📄 Экспорт MD</a>
+  <a class="btn" href="/api/eeat-library/documents">API JSON</a>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="leak-stats">
+  <div class="leak-stat"><div class="val">{{ stats.documents }}</div><div class="lbl">Документов</div></div>
+  <div class="leak-stat"><div class="val">{{ stats.insights }}</div><div class="lbl">Insights</div></div>
+  {% for tier, count in stats.by_tier.items() %}
+  <div class="leak-stat"><div class="val">{{ count }}</div><div class="lbl">{{ tier_labels.get(tier, tier) }}</div></div>
+  {% endfor %}
+</div>
+
+<div class="tabs-sub leak-tabs">
+  <a href="/eeat-library?tab=insights" class="{% if tab == 'insights' %}active{% endif %}">💡 Insights</a>
+  <a href="/eeat-library?tab=library" class="{% if tab == 'library' %}active{% endif %}">📚 Документы</a>
+  <a href="/eeat-library?tab=research" class="{% if tab == 'research' %}active{% endif %}">🔍 AI Research</a>
+  <a href="/ymyl-library">⚠️ YMYL Library</a>
+  <a href="/eeat" class="">↩ E-E-A-T аудит</a>
+</div>
+
+{% if tab == 'insights' %}
+<section>
+  <p class="msb-page-meta">
+    Выводы из официальных источников, legal Quickex, Trustpilot, BestChange, Bitcointalk и регуляторики — привязка к критериям EE01–EE28.
+  </p>
+  {% for ins in insights %}
+  <article class="rec-card pri-{{ ins.severity }}">
+    <div class="rec-top">
+      <span class="prio prio-{{ ins.severity }}">{{ ins.severity }}</span>
+      <span class="src-tag">{{ ins.eeat_pillar }} · {{ ins.criteria_ids|join(', ') }}</span>
+      <code class="leak-tag">{{ ins.id }}</code>
+    </div>
+    <h3 class="rec-title">{{ ins.title }}</h3>
+    <div class="rec-action"><strong>Рекомендация:</strong> {{ ins.recommendation }}</div>
+    {% if ins.document_title %}
+    <div class="rec-meta">
+      <strong>Источник:</strong>
+      <a href="{{ ins.document_url }}" target="_blank" rel="noopener">{{ ins.document_title }}</a>
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</section>
+
+{% elif tab == 'library' %}
+<section>
+  <div class="toolbar" style="margin-bottom:1rem">
+    <select class="btn" id="tier-filter" onchange="location.href='/eeat-library?tab=library&tier='+this.value">
+      <option value="">Все tier</option>
+      {% for key, label in tier_labels.items() %}
+      <option value="{{ key }}" {% if filter_tier == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select class="btn" id="cat-filter" onchange="location.href='/eeat-library?tab=library&category='+this.value">
+      <option value="">Все категории</option>
+      {% for key, label in category_labels.items() %}
+      <option value="{{ key }}" {% if filter_category == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% if selected_doc %}
+  <p><a href="/eeat-library?tab=library">← Все документы</a></p>
+  <div class="rec-meta" style="margin-bottom:1rem">
+    <span class="src-tag">{{ tier_labels.get(selected_doc.tier, selected_doc.tier) }}</span>
+    <span class="src-tag">{{ supports_labels.get(selected_doc.supports_brand, selected_doc.supports_brand) }}</span>
+    <span class="src-tag">Pillar: {{ pillar_labels.get(selected_doc.eeat_pillar, selected_doc.eeat_pillar) }}</span>
+    <a href="{{ selected_doc.source_url }}" target="_blank" rel="noopener">Оригинал ↗</a>
+  </div>
+  <div class="lib-content">{{ doc_html|safe }}</div>
+  {% else %}
+  <div class="doc-grid">
+    {% for doc in documents %}
+    <a class="doc-card" href="/eeat-library?tab=library&doc={{ doc.id }}">
+      <span class="cred">{{ tier_labels.get(doc.tier, doc.tier) }}</span>
+      <h4>{{ doc.title }}</h4>
+      <p>{{ doc.summary }}</p>
+      <p class="doc-card-meta">
+        {{ supports_labels.get(doc.supports_brand, doc.supports_brand) }} ·
+        {{ category_labels.get(doc.category, doc.category) }} ·
+        rel={{ doc.relevance_score }}
+      </p>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+
+{% elif tab == 'research' %}
+<section>
+  <p class="msb-page-meta">
+    История AI Research (Perplexity sonar-pro). Новые документы и insights автоматически попадают в библиотеку после каждого прогона с <code>/eeat</code> → 🔍 AI Research.
+  </p>
+  {% if latest_research %}
+  <div class="hint-box">
+    Последний прогон: <strong>{{ latest_research.model or '—' }}</strong> ·
+    {{ latest_research.page_url }} ·
+    {% if latest_research.ingest %}
+    +{{ latest_research.ingest.documents.added or 0 }} docs,
+    {{ latest_research.ingest.insights_added or 0 }} insights
+    {% endif %}
+  </div>
+  {% endif %}
+  <table class="rules-table">
+    <thead>
+      <tr><th>ID</th><th>Страница</th><th>Модель</th><th>Статус</th><th>Ingest</th><th>Дата</th></tr>
+    </thead>
+    <tbody>
+      {% for run in research_runs %}
+      <tr>
+        <td><code>{{ run.id }}</code></td>
+        <td class="small">{{ run.page_label or run.page_url }}</td>
+        <td>{{ run.model or '—' }}</td>
+        <td>{{ run.status }}</td>
+        <td class="small">
+          {% if run.ingest %}
+          +{{ run.ingest.documents.added or 0 }} doc,
+          {{ run.ingest.insights_added or 0 }} ins
+          {% else %}—{% endif %}
+        </td>
+        <td class="small">{{ run.started_at }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">Пока нет прогонов — запусти AI Research на странице <a href="/eeat">E-E-A-T</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

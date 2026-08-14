@@ -1,0 +1,29 @@
+services:
+  msb:
+    build: .
+    ports:
+      - "${MONITOR_PORT:-8787}:8787"
+    env_file:
+      - .env
+    environment:
+      ENV: production
+      MONITOR_HOST: 0.0.0.0
+      CONFIG_PROFILE: ${CONFIG_PROFILE:-quickex}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backup:
+    image: alpine:3.20
+    volumes:
+      - ./data:/data
+      - ./scripts:/scripts:ro
+    entrypoint: ["/bin/sh", "-c", "while true; do /scripts/backup_db.sh; sleep 21600; done"]
+    restart: unless-stopped
+    profiles:
+      - backup

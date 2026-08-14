@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% set active = 'ahrefs' %}
+{% block title %}Ahrefs — {{ product_full }}{% endblock %}
+
+{% block page_header %}
+{% set breadcrumb = product_full ~ ' / Ahrefs' %}
+{% set page_title = 'Ссылочный профиль — ' ~ site_name ~ ((' (' ~ domain ~ ')') if domain else '') %}
+{% if has_ahrefs_key %}
+{% set page_subtitle = 'Автопроверка: каждый понедельник в ' ~ ahrefs_cron_hour ~ ':00 · период ' ~ week_from ~ ' → ' ~ week_to %}
+{% endif %}
+{% set page_actions %}
+  <button class="btn primary" id="btn-ahrefs-run" {% if not has_ahrefs_key %}disabled{% endif %}>↻ Обновить сейчас</button>
+  <a class="btn{% if not run %} btn--disabled{% endif %}" href="/api/export/ahrefs-design.md">📄 Бриф для дизайна</a>
+  <a class="btn{% if not run %} btn--disabled{% endif %}" href="/api/export/ahrefs-links.csv">⬇ CSV ссылок</a>
+{% endset %}
+{% include 'partials/page_header.html' %}
+{% endblock %}
+
+{% block content %}
+{% if not has_ahrefs_key %}
+<div class="warn-box">⚠️ Добавь <code>AHREFS_API_KEY</code> в <code>.env</code> и перезапусти сервер.</div>
+{% endif %}
+
+{% set m = payload.metrics or {} %}
+{% set s = payload.summary or run.summary if run else {} %}
+
+<div class="ah-grid">
+  <div class="ah-kpi">
+    <div class="val">{{ m.domain_rating or '—' }}</div>
+    <div class="lbl">Domain Rating</div>
+  </div>
+  <div class="ah-kpi">
+    <div class="val">{% if m.live_refdomains %}{{ '{:,}'.format(m.live_refdomains) }}{% else %}—{% endif %}</div>
+    <div class="lbl">Referring domains</div>
+  </div>
+  <div class="ah-kpi">
+    <div class="val">{{ m.org_traffic or '—' }}</div>
+    <div class="lbl">Org. traffic</div>
+  </div>
+  <div class="ah-kpi">
+    <div class="val">{{ s.new_links or '—' }}</div>
+    <div class="lbl">Новых ссылок / нед</div>
+  </div>
+  <div class="ah-kpi">
+    <div class="val stat-val--pass">{{ s.quality_links or 0 }}</div>
+    <div class="lbl">Качественных DR≥15</div>
+  </div>
+  <div class="ah-kpi">
+    <div class="val">{{ s.new_refdomains or '—' }}</div>
+    <div class="lbl">Новых доменов</div>
+  </div>
+  <div class="ah-kpi">
+    <div class="val stat-val--fail">{{ s.spam_links or 0 }}</div>
+    <div class="lbl">Спам / риск</div>
+  </div>
+  <div class="ah-kpi">
+    <div class="val">{{ m.org_keywords or '—' }}</div>
+    <div class="lbl">Ключевых слов</div>
+  </div>
+</div>
+
+<div class="ah-two">
+  <div class="panel">
+    <h3>⭐ Качественные ссылки (для social proof)</h3>
+    {% set quality = payload.quality_links or [] %}
+    {% if quality %}
+      {% for link in quality[:12] %}
+      <div class="link-row">
+        <span class="dr-badge dr-high">{{ link.dr|round(0)|int }}</span>
+        <a href="{{ link.url_from }}" target="_blank" rel="noopener">{{ (link.url_from or '')|truncate(55) }}</a>
+        <span class="tag tag-bucket">{{ link.bucket }}</span>
+        <div class="link-row-meta">→ {{ (link.url_to or '')|truncate(60) }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">Нет качественных ссылок за период — запусти проверку или дождись понедельника.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h3>📄 Страницы с новыми ссылками (для дизайна OG/превью)</h3>
+    {% set buckets = payload.links_by_bucket or {} %}
+    {% if buckets %}
+      {% for bucket, links in buckets.items() %}
+      <div class="link-row">
+        <strong>{{ bucket }}</strong> — {{ links|length }} ссылок
+        <div class="link-row-meta">
+          {% for l in links[:3] %}{{ (l.url_to or '')|truncate(40) }}{% if not loop.last %}, {% endif %}{% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">Нет данных по страницам.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel panel--spaced">
+  <h3>📝 Бриф для дизайна (превью)</h3>
+  {% if payload.designer_brief_md %}
+  <div class="brief-preview">{{ payload.designer_brief_md[:2500] }}{% if payload.designer_brief_md|length > 2500 %}…{% endif %}</div>
+  <p class="brief-footer">Полный файл: <a href="/api/export/ahrefs-design.md">скачать .md</a> · отправь в дизайн по понедельникам</p>
+  {% else %}
+  <p class="muted">Запусти проверку — сформируется markdown-файл для команды дизайна.</p>
+  {% endif %}
+</div>
+
+<div class="panel">
+  <h3>История проверок</h3>
+  <table class="history-table">
+    <thead><tr><th>Дата</th><th>Период</th><th>Новых</th><th>Качество</th><th>Спам</th><th>Триггер</th></tr></thead>
+    <tbody>
+      {% for h in history %}
+      <tr>
+        <td>{{ h.started_at[:16].replace('T',' ') }}</td>
+        <td>{{ h.period_from }} → {{ h.period_to }}</td>
+        <td>{{ h.summary.new_links or '—' }}</td>
+        <td>{{ h.summary.quality_links or 0 }}</td>
+        <td>{{ h.summary.spam_links or 0 }}</td>
+        <td>{{ h.trigger }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">Пока нет проверок</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('btn-ahrefs-run')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-ahrefs-run');
+    btn.disabled = true;
+    btn.textContent = 'Загружаю Ahrefs…';
+    try {
+      const r = await fetch('/api/ahrefs/run', { method: 'POST', headers: apiHeaders?.() || {} });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || d.detail || 'HTTP ' + r.status);
+      location.reload();
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '↻ Обновить сейчас';
+    }
+  });
+</script>
+{% endblock %}

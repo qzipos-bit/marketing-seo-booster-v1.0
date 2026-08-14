@@ -1,0 +1,73 @@
+# Prompt sent to every model during health check
+model_probe_prompt: "Ответь одним словом: OK"
+
+# Kie chat models to probe (name, endpoint path, payload builder key)
+models:
+  - id: gpt-5-6-luna
+    label: GPT 5.6 Luna
+    family: codex
+    model: gpt-5-6-luna
+
+  - id: gpt-5-6-terra
+    label: GPT 5.6 Terra
+    family: codex
+    model: gpt-5-6-terra
+
+  - id: gpt-5-6-sol
+    label: GPT 5.6 Sol
+    family: codex
+    model: gpt-5-6-sol
+
+  - id: gpt-5-4
+    label: GPT 5.4
+    family: codex
+    model: gpt-5-4
+
+  - id: gpt-5-5
+    label: GPT 5.5
+    family: codex
+    model: gpt-5-5
+
+  - id: grok-4-5
+    label: Grok 4.5
+    family: grok
+    model: grok-4-5
+
+  - id: grok-4-6
+    label: Grok 4.6
+    family: grok
+    model: grok-4-6
+
+  - id: claude-fable-5
+    label: Claude Fable 5
+    family: claude
+    model: claude-fable-5
+
+  - id: claude-sonnet-4-6
+    label: Claude Sonnet 4.6
+    family: claude
+    model: claude-sonnet-4-6
+
+  - id: gemini-3-flash
+    label: Gemini 3 Flash
+    family: gemini
+    model: gemini-3-flash
+
+# SEO targets — pages to audit
+seo:
+  site_name: Altcoinlog
+  pages:
+    - url: http://localhost:3000
+      label: Главная (local)
+    - url: http://localhost:3000/kursy-kriptovalut
+      label: Курсы криптовалют
+    - url: http://localhost:3000/reitingi
+      label: Рейтинги
+    - url: http://localhost:3000/novosti
+      label: Новости
+    - url: http://localhost:3000/sitemap.xml
+      label: Sitemap
+      type: xml
+    - url: http://localhost:3000/robots.txt
+      label: Robots
+      type: text
