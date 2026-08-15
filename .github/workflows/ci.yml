@@ -5,6 +5,14 @@ on:
     branches: [main, master]
   pull_request:
 
+env:
+  SCAN_INTERVAL_MIN: "0"
+  SCAN_CRON_TIMES: "off"
+  AUTO_CHECK_INTERVAL_MIN: "0"
+  SCAN_SKIP_AI_REVIEW: "true"
+  MONITOR_API_TOKEN: ""
+  CONFIG_PROFILE: quickex
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -13,6 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
       - run: pip install -r requirements.txt
       - run: python -m compileall app
       - run: pytest tests/ -q

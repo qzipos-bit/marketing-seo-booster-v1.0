@@ -1,6 +1,22 @@
 .venv/
 .env
-data/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Runtime / local DB (never commit)
+data/monitor.db
+data/monitor.db-*
+data/backups/
+data/exports/
+
+# Ignore all data by default, then allow library seed content
+data/*
+!data/eeat-library/
+!data/eeat-library/**
+!data/ymyl-library/
+!data/ymyl-library/**
+!data/google-leaks/
+!data/google-leaks/**
+!data/quickex/
+!data/quickex/**

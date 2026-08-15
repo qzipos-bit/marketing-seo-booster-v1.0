@@ -103,8 +103,9 @@ def test_command_api(client):
 
 def test_evaluate_scan_alerts_score_drop():
     from app.alerts import evaluate_scan_alerts
-    from app.storage import finish_scan_run, start_scan_run
+    from app.storage import finish_scan_run, init_db, start_scan_run
 
+    init_db()
     sid1 = start_scan_run("test.io", "test", "unit")
     finish_scan_run(sid1, "ok", {"checklist_score": 80.0}, {})
     sid2 = start_scan_run("test.io", "test", "unit")
