@@ -99,3 +99,5 @@ Variable: `PRODUCTION_URL`.
 The workflow transfers the exact commit as a Git bundle over SSH, so deployment
 continues to work if the repository becomes private. No GitHub PAT or repository
 private key is stored on the server.
+
+Production CI/CD was verified with consecutive deployments on 2026-08-17.
