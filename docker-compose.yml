@@ -1,8 +1,9 @@
 services:
   msb:
     build: .
+    image: marketing-seo-booster:local
     ports:
-      - "${MONITOR_PORT:-8787}:8787"
+      - "127.0.0.1:${MONITOR_PORT:-8787}:8787"
     env_file:
       - .env
     environment:
@@ -19,11 +20,16 @@ services:
       retries: 3
 
   backup:
-    image: alpine:3.20
+    image: marketing-seo-booster:local
     volumes:
       - ./data:/data
       - ./scripts:/scripts:ro
     entrypoint: ["/bin/sh", "-c", "while true; do /scripts/backup_db.sh; sleep 21600; done"]
+    depends_on:
+      msb:
+        condition: service_healthy
+    healthcheck:
+      disable: true
     restart: unless-stopped
     profiles:
       - backup

@@ -1,9 +1,13 @@
-name: CI
+name: CI/CD
 
 on:
   push:
     branches: [main, master]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   SCAN_INTERVAL_MIN: "0"
@@ -15,6 +19,7 @@ env:
 
 jobs:
   test:
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +32,69 @@ jobs:
       - run: pytest tests/ -q
 
   docker:
+    name: Docker Build
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t msb:test .
+
+  deploy:
+    name: Deploy Production
+    needs: docker
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure deployment SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+
+      - name: Deploy exact commit
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -o pipefail
+          echo "Deploying commit ${GITHUB_SHA::7}"
+          git bundle create /tmp/deploy.bundle HEAD
+          cat /tmp/deploy.bundle | ssh -i ~/.ssh/deploy_key \
+            -p "$DEPLOY_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "deploy $GITHUB_SHA"
+
+  production-healthcheck:
+    name: Production Healthcheck
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check production HTTPS
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          for attempt in {1..12}; do
+            if curl -fsS "$PRODUCTION_URL/health" >/dev/null; then
+              curl -fsS "$PRODUCTION_URL/" >/dev/null
+              echo "Production HTTPS healthcheck passed"
+              exit 0
+            fi
+            echo "Waiting for production healthcheck ($attempt/12)"
+            sleep 5
+          done
+          exit 1
